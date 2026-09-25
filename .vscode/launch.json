@@ -1,0 +1,8 @@
+{
+  "version":"0.2.0",
+  "configurations":[
+    {"name":"Scanner Server","type":"coreclr","request":"launch","preLaunchTask":"prepare local run","program":"${workspaceFolder}/src/Scanner.Server/bin/Debug/net10.0-windows/Scanner.Server.exe","args":["--data-dir","${workspaceFolder}/.local/run/server"],"cwd":"${workspaceFolder}","env":{"DOTNET_ROOT":"${workspaceFolder}/.tools/dotnet","DOTNET_ROOT_X64":"${workspaceFolder}/.tools/dotnet"}},
+    {"name":"Scanner TestClient","type":"coreclr","request":"launch","preLaunchTask":"prepare local run","program":"${workspaceFolder}/src/Scanner.TestClient/bin/Debug/net10.0-windows/Scanner.TestClient.exe","args":["--data-dir","${workspaceFolder}/.local/run/client"],"cwd":"${workspaceFolder}","env":{"DOTNET_ROOT":"${workspaceFolder}/.tools/dotnet","DOTNET_ROOT_X64":"${workspaceFolder}/.tools/dotnet"}}
+  ],
+  "compounds":[{"name":"Server + TestClient","configurations":["Scanner Server","Scanner TestClient"],"stopAll":true}]
+}

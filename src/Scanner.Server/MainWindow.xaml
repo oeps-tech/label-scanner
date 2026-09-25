@@ -1,0 +1,67 @@
+<Window x:Class="Scanner.Server.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="OEPS Scanner" Width="900" Height="350" WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
+ <Window.Resources><BooleanToVisibilityConverter x:Key="BooleanToVisibility"/></Window.Resources>
+ <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="16">
+  <TextBlock Text="OEPS Scanner" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12"/>
+  <Border Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,10"><StackPanel>
+   <WrapPanel>
+    <TextBlock Text="Camera" VerticalAlignment="Center" Margin="0,0,10,0"/>
+    <ComboBox ItemsSource="{Binding Cameras}" SelectedItem="{Binding SelectedCamera}" DisplayMemberPath="Name" IsEnabled="{Binding CanChooseCamera}" Width="210"/>
+    <Button Content="Refresh cameras" Command="{Binding RefreshCamerasCommand}"/>
+    <Button Content="Camera settings" Command="{Binding CameraSettingsCommand}"/>
+    <StackPanel VerticalAlignment="Center" Margin="12,0">
+     <CheckBox Content="Keep camera connected (debug)" IsChecked="{Binding KeepCameraConnected}" Margin="0,0,0,6"/>
+     <CheckBox Content="Show details (debug)" IsChecked="{Binding ShowDetails}" Margin="0"/>
+    </StackPanel>
+   </WrapPanel>
+   <TextBlock Text="{Binding CameraStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+  </StackPanel></Border>
+  <Border Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,10"><StackPanel>
+   <WrapPanel>
+    <TextBlock Text="WebSocket port" VerticalAlignment="Center" Margin="0,0,8,0"/>
+    <TextBox Text="{Binding Port}" Width="75"/>
+    <Button Content="Apply" Command="{Binding ApplyNetworkCommand}"/>
+    <TextBlock Text="{Binding ClientStatus}" VerticalAlignment="Center" Margin="12,0"/>
+   </WrapPanel>
+   <ItemsControl ItemsSource="{Binding Addresses}" FontSize="11" Margin="0,6,0,0"/>
+  </StackPanel></Border>
+  <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" Foreground="Firebrick" Margin="0,0,0,8">
+   <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}"><Style.Triggers>
+    <DataTrigger Binding="{Binding Notice}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+   </Style.Triggers></Style></TextBlock.Style>
+  </TextBlock>
+  <StackPanel x:Name="DetailsPanel" Visibility="{Binding ShowDetails, Converter={StaticResource BooleanToVisibility}}">
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border Background="White" Padding="12" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"><StackPanel>
+    <TextBlock Text="Camera preview" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
+    <Grid Height="310" Background="#E9EDF1">
+     <TextBlock Text="{Binding PreviewPlaceholder}" TextAlignment="Center" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+     <Image Source="{Binding PreviewImage}" Stretch="Uniform"/>
+    </Grid>
+    <DockPanel Margin="0,8,0,0"><CheckBox DockPanel.Dock="Right" Content="Enable camera preview" IsChecked="{Binding PreviewEnabled}"/><TextBlock Text="{Binding PreviewFps}"/></DockPanel>
+   </StackPanel></Border>
+   <Border Grid.Column="2" Background="White" Padding="12" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"><StackPanel>
+    <TextBlock Text="Latest valid data" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
+    <TextBox Text="{Binding LastJson, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto"/>
+    <TextBlock Text="Only these four fields are sent to clients. Version, field formats and CRC-32 must pass. Duplicate interval: 500 ms per payload." TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+    <Button Content="Label versions &amp; JSON" Click="OpenLabelVersions" HorizontalAlignment="Left" Margin="0,12,0,0"/>
+   </StackPanel></Border>
+  </Grid>
+  <Border Background="White" Padding="12" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Margin="0,12,0,0"><StackPanel>
+   <TextBlock Text="Live diagnostics" Style="{StaticResource SectionTitle}"/>
+   <TextBlock Text="{Binding FrameStatus}" FontSize="11" Margin="0,6,0,0"/>
+   <TextBlock Text="{Binding Timing}" FontSize="11"/>
+   <TextBlock Text="{Binding Counters}" FontSize="11" Margin="0,0,0,8"/>
+   <DataGrid ItemsSource="{Binding Diagnostics}" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" Height="150">
+    <DataGrid.Columns>
+     <DataGridTextColumn Header="Decoded payload" Binding="{Binding Raw}" Width="2*"/>
+     <DataGridTextColumn Header="Result" Binding="{Binding Status}" Width="*"/>
+     <DataGridTextColumn Header="Detail" Binding="{Binding Reason}" Width="*"/>
+     <DataGridTextColumn Header="Expected CRC" Binding="{Binding ExpectedChecksum}" Width="100"/>
+    </DataGrid.Columns>
+   </DataGrid>
+   <TextBlock Text="Diagnostics are held in memory only. No label images or scan history are saved." FontSize="11" Margin="0,8,0,0"/>
+  </StackPanel></Border>
+  </StackPanel>
+ </StackPanel></ScrollViewer>
+</Window>

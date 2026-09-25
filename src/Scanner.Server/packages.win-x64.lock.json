@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "OEPS.Scanner.Contracts": {
+        "type": "Project"
+      },
+      "scanner.core": {
+        "type": "Project",
+        "dependencies": {
+          "OEPS.Scanner.Contracts": "[0.1.0, )"
+        }
+      },
+      "scanner.desktop": {
+        "type": "Project"
+      }
+    },
+    "net10.0-windows7.0/win-x64": {}
+  }
+}

@@ -1,0 +1,3 @@
+numpy==2.2.6
+opencv-contrib-python-headless==4.12.0.88
+zxing-cpp==2.3.0

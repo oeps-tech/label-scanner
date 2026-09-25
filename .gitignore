@@ -1,0 +1,12 @@
+.tools/
+.local/
+artifacts/
+**/bin/
+**/obj/
+**/__pycache__/
+.venv/
+*.user
+.vs/
+models/
+!models/README.md
+*.log

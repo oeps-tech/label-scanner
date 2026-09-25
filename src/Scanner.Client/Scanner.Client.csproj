@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <Version>0.1.0</Version><GenerateDocumentationFile>true</GenerateDocumentationFile><NoWarn>$(NoWarn);1591</NoWarn>
+    <PackageId>OEPS.Scanner.Client</PackageId><Description>Connect to an OEPS scanner server, receive label JSON, and close the connection.</Description>
+    <Authors>OEPS</Authors>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Scanner.Contracts/Scanner.Contracts.csproj" /></ItemGroup>
+</Project>

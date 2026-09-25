@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><ApplicationIcon>../../assets/app.ico</ApplicationIcon></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Scanner.Client/Scanner.Client.csproj"/><ProjectReference Include="../Scanner.Desktop/Scanner.Desktop.csproj"/></ItemGroup>
+</Project>

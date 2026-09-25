@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <Version>0.1.0</Version><GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>OEPS.Scanner.Contracts</PackageId><Authors>OEPS</Authors>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+    <Description>Versioned OEPS scanner protocol contracts and exact payload validators.</Description>
+  </PropertyGroup>
+</Project>
