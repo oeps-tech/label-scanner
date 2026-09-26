@@ -1,0 +1,12 @@
+<UserControl x:Class="Scanner.Desktop.ReleaseFooter"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+ xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Border BorderBrush="{StaticResource LineBrush}" BorderThickness="0,1,0,0" Padding="16,5">
+  <DockPanel>
+   <TextBlock x:Name="VersionLabel" DockPanel.Dock="Right" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="12,0,0,0"/>
+   <TextBlock x:Name="UpdateNotice" Visibility="Collapsed" FontSize="11" HorizontalAlignment="Right">
+    <Hyperlink x:Name="UpdateLink" Click="ShowUpdateInstructions">Update available</Hyperlink>
+   </TextBlock>
+  </DockPanel>
+ </Border>
+</UserControl>

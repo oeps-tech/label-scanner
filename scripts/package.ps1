@@ -19,7 +19,8 @@ $fullStage = Join-Path $stage 'full-installer'
 $name = "OEPS.Scanner-$Version-win-x64.zip"
 $zipPath = Join-Path $output $name
 $msiPath = Join-Path $output "OEPS.Scanner-$Version-setup-win-x64.msi"
-foreach ($target in @($zipPath, ($zipPath + '.sha256'), $msiPath, ($msiPath + '.sha256'))) {
+$sdkZip = Join-Path $output "OEPS.Scanner.Client-$Version.zip"
+foreach ($target in @($zipPath, ($zipPath + '.sha256'), $msiPath, ($msiPath + '.sha256'), $sdkZip, ($sdkZip + '.sha256'))) {
     if (Test-Path -LiteralPath $target) { throw "Release artifact already exists: $target. Archive it or select a new version." }
 }
 New-Item -ItemType Directory -Force -Path $appStage,$fullStage | Out-Null
@@ -52,10 +53,13 @@ function Write-Checksum([string]$Path) {
     [IO.File]::WriteAllText(($Path + '.sha256'),($value + [Environment]::NewLine),[Text.UTF8Encoding]::new($false))
 }
 Write-Checksum $zipPath
+& (Join-Path $PSScriptRoot 'build-client.ps1') -Configuration Release -Version $Version
+Compress-Archive -Path (Join-Path $repo '.local\client-sdk\*') -DestinationPath $sdkZip
+Write-Checksum $sdkZip
 Copy-Item -LiteralPath $zipPath,($zipPath + '.sha256') -Destination $fullStage
 if (-not $SkipMsi) { & (Join-Path $PSScriptRoot 'Build-Msi.ps1') -Stage $fullStage -Version $Version -Output $msiPath -Dotnet $dotnet; Write-Checksum $msiPath }
 foreach ($package in @('Contracts','Client')) {
-    & $dotnet pack (Join-Path $repo "src\Scanner.$package") -c Release -p:PackageVersion=$Version -o $output --nologo
+    & $dotnet pack (Join-Path $repo "src\Scanner.$package") -c Release -p:Version=$Version -p:PackageVersion=$Version -o $output --nologo
     if ($LASTEXITCODE -ne 0) { throw "$package NuGet packaging failed." }
 }
 Write-Output "Release ZIP: $zipPath"

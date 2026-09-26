@@ -1,5 +1,25 @@
 param([Parameter(Mandatory)][string]$ApplicationDirectory,[Parameter(Mandatory)][string]$RuntimeDirectory)
 $ErrorActionPreference = 'Stop'
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class SmokeWindow {
+    private delegate bool EnumProc(IntPtr window, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
+    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    public static bool Close(int processId) {
+        bool sent = false;
+        EnumWindows((window, parameter) => {
+            uint owner;
+            GetWindowThreadProcessId(window, out owner);
+            if (owner == (uint)processId) sent |= PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);
+            return true;
+        }, IntPtr.Zero);
+        return sent;
+    }
+}
+'@
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $appDirectory = (Resolve-Path -LiteralPath $ApplicationDirectory).Path
 $runtime = (Resolve-Path -LiteralPath $RuntimeDirectory).Path
@@ -9,6 +29,12 @@ $env:DOTNET_ROOT = $runtime
 $env:DOTNET_ROOT_X64 = $runtime
 $env:DOTNET_MULTILEVEL_LOOKUP = '0'
 $serverData = Join-Path $smokeDirectory 'server'
+New-Item -ItemType Directory -Force -Path $serverData | Out-Null
+$listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
+$listener.Start()
+$smokePort = $listener.LocalEndpoint.Port
+$listener.Stop()
+[IO.File]::WriteAllText((Join-Path $serverData 'settings.json'), ('{"port":' + $smokePort + '}'))
 $serverArguments = '--ui-smoke --data-dir "' + $serverData + '"'
 $serverProcess = Start-Process -FilePath (Join-Path $appDirectory 'Scanner.Server.exe') -ArgumentList $serverArguments -WorkingDirectory $appDirectory -WindowStyle Hidden -PassThru
 try {
@@ -21,13 +47,13 @@ try {
 $readyName = 'Local\OEPS.Scanner.Ready.' + [Guid]::NewGuid().ToString('N')
 $ready = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::ManualReset, $readyName)
 $clientData = Join-Path $smokeDirectory 'client'
-$clientArguments = '--startup-ready "' + $readyName + '" --data-dir "' + $clientData + '"'
+$clientArguments = '--ui-smoke --startup-ready "' + $readyName + '" --data-dir "' + $clientData + '"'
 $clientProcess = Start-Process -FilePath (Join-Path $appDirectory 'Scanner.TestClient.exe') -ArgumentList $clientArguments -WorkingDirectory $appDirectory -WindowStyle Hidden -PassThru
 try {
     if (-not $ready.WaitOne(15000)) { throw 'Published Test Client did not acknowledge WPF startup readiness.' }
     $clientProcess.Refresh()
     if ($clientProcess.HasExited) { throw 'Published Test Client exited before startup validation.' }
-    if (-not $clientProcess.CloseMainWindow()) { throw 'Published Test Client did not expose a native window for graceful close.' }
+    if (-not [SmokeWindow]::Close($clientProcess.Id)) { throw 'Published Test Client did not expose a native window for graceful close.' }
     if (-not $clientProcess.WaitForExit(10000)) { throw 'Published Test Client did not close gracefully.' }
     if ($clientProcess.ExitCode -ne 0) { throw "Published Test Client exited $($clientProcess.ExitCode)." }
     $result = 'PASS: published Test Client acknowledged native WPF readiness and closed gracefully using bundled .NET runtime.'

@@ -4,6 +4,8 @@ Windows server and test client. The server reads Data Matrix ECC 200 directly fr
 
 ## Local run
 
+For installation, download the Windows x64 MSI from [GitHub Releases](https://github.com/oeps-tech/label-scanner/releases/latest). It installs both server and test client with separate shortcuts and includes the .NET and Python runtimes. Both apps show their version at the bottom right. The launcher offers updates on startup; offline operation uses the installed version. Close both apps before updating. The release also includes a client SDK ZIP for integration into other C#/.NET applications.
+
 Run `Run.cmd` to build and open both applications. No model download is required. To prepare/build without opening windows:
 
 ```powershell

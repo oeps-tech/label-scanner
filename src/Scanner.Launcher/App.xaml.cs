@@ -71,11 +71,13 @@ internal sealed class LaunchWindow : Window
                         candidate = await store.StagePackageAsync(path, checksum, version, cancellationToken: _closing.Token);
                     }
                 }
-                // A working offline station starts without a network dependency. Updates are explicit.
-                if (!_recover && _args.Contains("--check-updates", StringComparer.Ordinal))
+                // Like the other OEPS launchers, offer updates at startup and fall back offline.
+                // Both applications share a version: avoid mixing versions during an active session.
+                if (!_recover && !_args.Contains("--no-update-check", StringComparer.Ordinal)
+                    && !AppInstanceCoordinator.IsAppRunning("Server") && !AppInstanceCoordinator.IsAppRunning("TestClient"))
                 {
                     _status.Text = "Checking published OEPS Scanner releases…";
-                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
                     var latest = await new GitHubReleaseClient(http, "oeps-tech", "label-scanner", "OEPS.Scanner").GetLatestReleaseAsync(_closing.Token);
                     var current = candidate?.Version ?? state.Current?.Version;
                     if (latest is not null && (current is null || latest.Version.CompareTo(SemanticVersion.Parse(current)) > 0)

@@ -1,11 +1,16 @@
-param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug')
+param([ValidateSet('Debug','Release')][string]$Configuration = 'Debug', [string]$Version = '')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $env:DOTNET_CLI_HOME = Join-Path $repo '.local\dotnet'
 $env:NUGET_PACKAGES = Join-Path $repo '.local\nuget'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 $dotnet = Join-Path $repo '.tools\dotnet\dotnet.exe'
-& $dotnet build (Join-Path $repo 'src\Scanner.Client\Scanner.Client.csproj') -c $Configuration -p:RestoreLockedMode=true --nologo
+$versionArguments = @()
+if ($Version) {
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid SDK version.' }
+    $versionArguments += "-p:Version=$Version"
+}
+& $dotnet build (Join-Path $repo 'src\Scanner.Client\Scanner.Client.csproj') -c $Configuration -p:RestoreLockedMode=true @versionArguments --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Client DLL build failed.' }
 $source = Join-Path $repo "src\Scanner.Client\bin\$Configuration\net10.0"
 $output = Join-Path $repo '.local\client-sdk'

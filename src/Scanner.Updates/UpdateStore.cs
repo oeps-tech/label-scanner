@@ -221,7 +221,10 @@ public sealed class UpdateStore
         if (manifest.RuntimeMajor != supportedRuntimeMajor || manifest.Architecture != "x64")
             throw new IncompatibleUpdateException($"Release {manifest.Version} requires .NET Desktop Runtime {manifest.RuntimeMajor} and {manifest.Architecture}. Install its new full installer to upgrade; the existing app will continue to run.");
         if (manifest.Executable != ExecutableName) throw new InvalidDataException("Unexpected update executable.");
-        foreach (var file in new[] { ExecutableName, "Scanner.Server.dll", "Scanner.Core.dll", "Scanner.Server.deps.json", "Scanner.Server.runtimeconfig.json", "Scanner.TestClient.exe", "Scanner.TestClient.dll", "Scanner.Contracts.dll" })
+        foreach (var file in new[] { ExecutableName, "Scanner.Server.dll", "Scanner.Core.dll", "Scanner.Server.deps.json", "Scanner.Server.runtimeconfig.json", "Scanner.TestClient.exe", "Scanner.TestClient.dll", "Scanner.Contracts.dll",
+            "Scanner.Client.dll", "Scanner.Desktop.dll", "Scanner.Updates.dll", "Scanner.TestClient.deps.json", "Scanner.TestClient.runtimeconfig.json",
+            "worker/python/python.exe", "worker/python/python312.dll", "worker/python/python312.zip", "worker/python/python312._pth",
+            "worker/recognition/worker.py", "worker/recognition/ipc.py", "worker/recognition/__init__.py" })
         {
             var path = Path.Combine(appDirectory, file);
             if (!File.Exists(path) || new FileInfo(path).Length == 0) throw new InvalidDataException($"Update package is missing {file}.");

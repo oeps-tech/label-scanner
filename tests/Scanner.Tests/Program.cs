@@ -81,7 +81,8 @@ internal static class Program
         Check(demand.ShouldConnect(0, true, true, 900_000), "Always-on debug override");
         Check(demand.ShouldConnect(0, false, true, 900_010), "Turning override off starts fresh minute");
         await NetworkAsync(PayloadValidator.Validate(encoded).Data!);
-        Console.WriteLine($"PASS: {_checks} validation, CRC, cooldown, camera lifecycle and network assertions.");
+        await UpdateChecks.RunAsync(Check);
+        Console.WriteLine($"PASS: {_checks} validation, CRC, cooldown, camera lifecycle, network and update assertions.");
         Console.WriteLine("Valid example: " + encoded);
     }
     private static async Task Until(Func<bool> check)

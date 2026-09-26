@@ -1,7 +1,8 @@
-<Window x:Class="Scanner.Server.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window x:Class="Scanner.Server.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:desktop="clr-namespace:Scanner.Desktop;assembly=Scanner.Desktop"
  Title="OEPS Scanner" Width="900" Height="350" WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
  <Window.Resources><BooleanToVisibilityConverter x:Key="BooleanToVisibility"/></Window.Resources>
- <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="16">
+ <DockPanel><desktop:ReleaseFooter DockPanel.Dock="Bottom"/>
+ <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="16,12,16,4">
   <TextBlock Text="OEPS Scanner" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12"/>
   <Border Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,10"><StackPanel>
    <WrapPanel>
@@ -63,5 +64,5 @@
    <TextBlock Text="Diagnostics are held in memory only. No label images or scan history are saved." FontSize="11" Margin="0,8,0,0"/>
   </StackPanel></Border>
   </StackPanel>
- </StackPanel></ScrollViewer>
+ </StackPanel></ScrollViewer></DockPanel>
 </Window>

@@ -23,7 +23,7 @@ public partial class MainWindow : Window
         model.PropertyChanged += ModelPropertyChanged;
         Closed += (_, _) => model.PropertyChanged -= ModelPropertyChanged;
         var smoke = args.Contains("--ui-smoke");
-        if (smoke) { ShowInTaskbar = false; Left = -15000; Top = -15000; }
+        if (smoke) { ShowInTaskbar = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -15000; Top = -15000; }
         Loaded += async (_, _) =>
         {
             await model.InitializeAsync(smoke);

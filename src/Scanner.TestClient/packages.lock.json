@@ -12,6 +12,12 @@
         "type": "Project"
       },
       "scanner.desktop": {
+        "type": "Project",
+        "dependencies": {
+          "Scanner.Updates": "[0.1.0, )"
+        }
+      },
+      "scanner.updates": {
         "type": "Project"
       }
     }

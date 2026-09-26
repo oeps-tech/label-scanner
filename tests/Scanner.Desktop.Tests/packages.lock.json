@@ -18,7 +18,10 @@
         }
       },
       "scanner.desktop": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "Scanner.Updates": "[0.1.0, )"
+        }
       },
       "scanner.server": {
         "type": "Project",

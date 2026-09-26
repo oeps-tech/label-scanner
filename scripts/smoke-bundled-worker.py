@@ -7,14 +7,20 @@ import struct
 import subprocess
 import sys
 import threading
+import time
 
 
 def main() -> None:
     worker = Path(sys.argv[1]).resolve()
     data = Path(sys.argv[2]).resolve()
     data.mkdir(parents=True, exist_ok=True)
-    environment = dict(os.environ, OEPS_SCANNER_DATA=str(data), HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
+    environment = dict(os.environ, OEPS_SCANNER_DATA=str(data))
     environment.pop("PYTHONPATH", None)
+    example = '1*OEPSA010123*0926-TRAY-Q5R2*1*D91C90D6'
+    fixture = data / 'datamatrix-fixture.png'
+    subprocess.run([str(worker / 'python/python.exe'), '-c',
+        'import sys,cv2,zxingcpp,numpy as np; cv2.imwrite(sys.argv[1],np.asarray(zxingcpp.write_barcode(zxingcpp.BarcodeFormat.DataMatrix,sys.argv[2],width=300,height=300,quiet_zone=12)))',
+        str(fixture), example], cwd=worker, env=environment, check=True)
     process = subprocess.Popen([str(worker / "python" / "python.exe"), "-u", "-m", "recognition.worker"], cwd=worker,
                                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
     messages: queue.Queue = queue.Queue()
@@ -54,12 +60,26 @@ def main() -> None:
             raise first
         if first.get("type") != "status" or first.get("state") != "ready":
             raise ValueError(f"Expected worker readiness, got {first}")
+        send({'type': 'local_preview', 'enabled': False})
+        send({'type': 'replay', 'generation': 1, 'path': str(fixture)})
+        deadline = time.monotonic() + 15
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError('Packaged worker did not decode the fixture')
+            result = messages.get(timeout=remaining)
+            if isinstance(result, Exception):
+                raise result
+            if result.get('type') == 'candidate' and result.get('codes'):
+                if result['codes'][0]['raw'] != example:
+                    raise ValueError('Packaged decoder returned the wrong data')
+                break
         send({"type": "shutdown"})
         process.wait(timeout=15)
         if process.returncode:
             raise RuntimeError(f"Worker exited {process.returncode}: {errors}")
         print(json.dumps({"result": "PASS", "python": str(worker / "python" / "python.exe"), "ready": first,
-                          "shutdown_exit_code": process.returncode, "offline": True, "camera_opened": False}, indent=2))
+                          "decoded": example, "shutdown_exit_code": process.returncode, "offline": True, "camera_opened": False}, indent=2))
     finally:
         if process.poll() is None:
             process.kill()

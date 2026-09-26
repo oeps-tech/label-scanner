@@ -9,13 +9,8 @@ if (-not (Test-Path -LiteralPath $pythonPath)) { throw 'Run scripts/setup-recogn
 if ($LASTEXITCODE -ne 0) { throw 'Runtime dependencies are incomplete.' }
 $outputPath = [IO.Path]::GetFullPath($Output)
 New-Item -ItemType Directory -Force -Path $outputPath | Out-Null
-$runtimeDestination = Join-Path $outputPath 'python'
-& robocopy $PythonDirectory $runtimeDestination /E /R:1 /W:1 /XD __pycache__ /NFL /NDL /NJH /NJS
-if ($LASTEXITCODE -ge 8) { throw 'Runtime copy failed.' }
-Copy-Item -LiteralPath (Join-Path $projectRoot 'recognition') -Destination (Join-Path $outputPath 'recognition') -Recurse -Force
-# Embedded Python _pth paths are relative to python.exe. Use an explicit trailing separator
-# for the parent: Windows normalizes bare '..' unexpectedly in isolated startup.
-@('python312.zip', '.', '..\', 'import site') | Set-Content -LiteralPath (Join-Path $outputPath 'python\python312._pth') -Encoding ASCII
+& $pythonPath (Join-Path $PSScriptRoot 'stage-worker.py') $outputPath
+if ($LASTEXITCODE -ne 0) { throw 'Clean worker runtime staging failed.' }
 & (Join-Path $outputPath 'python\python.exe') -c "import recognition.worker; print('Bundled worker import verified')"
 if ($LASTEXITCODE -ne 0) { throw 'Bundled worker import failed.' }
 Write-Output "Offline runtime bundled at $outputPath. No OCR models are required."

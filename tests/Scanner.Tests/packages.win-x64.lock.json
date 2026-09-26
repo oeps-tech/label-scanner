@@ -16,6 +16,9 @@
         "dependencies": {
           "OEPS.Scanner.Contracts": "[0.1.0, )"
         }
+      },
+      "scanner.updates": {
+        "type": "Project"
       }
     },
     "net10.0/win-x64": {}
