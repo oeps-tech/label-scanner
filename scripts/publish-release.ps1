@@ -16,7 +16,9 @@ $names += @("OEPS.Scanner.Client.$Version.nupkg", "OEPS.Scanner.Contracts.$Versi
 foreach ($name in $names) { if (-not (Test-Path -LiteralPath (Join-Path $repo ('artifacts\' + $name)))) { throw "Missing asset: $name" } }
 $verification = Get-Content -LiteralPath (Join-Path $repo 'artifacts\release-verification.json') -Raw | ConvertFrom-Json
 if ($verification.result -ne 'PASS' -or $verification.version -ne $Version) { throw 'Run verify-release.ps1 for this version before publication.' }
-$body = Get-Content -LiteralPath $notes -Raw -Encoding UTF8
+# Read a plain string: Windows PowerShell's Get-Content attaches provider metadata
+# that ConvertTo-Json can recursively expand when used inside a request object.
+$body = [IO.File]::ReadAllText($notes, [Text.Encoding]::UTF8)
 $dirty = & git -C $repo -c $safeRepo status --porcelain
 if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Commit all release source changes before publishing.' }
 $sha = (& git -C $repo -c $safeRepo rev-parse HEAD).Trim()
@@ -38,6 +40,7 @@ function Request([string]$Path, [string]$Method='GET', $Data=$null) {
 }
 if ((Request '').private) { throw 'Expected the already-public repository; visibility will not be changed by this script.' }
 if ((Request '/commits/main').sha -ne $sha) { throw 'Push the release commit to main before publishing.' }
+Write-Output 'GitHub source verified; preparing release.'
 $releases = @(Request '/releases')
 $release = $releases | Where-Object tag_name -eq $tag | Select-Object -First 1
 if (-not $release) {
@@ -56,6 +59,7 @@ foreach ($name in $names) {
         continue
     }
     if (-not $release.draft) { throw 'Will not modify assets of a published release.' }
+    Write-Output "Uploading: $name"
     $upload = [Uri](($release.upload_url -split '\{')[0] + '?name=' + [Uri]::EscapeDataString($name))
     if ($upload.Scheme -ne 'https' -or $upload.Host -ne 'uploads.github.com') { throw 'Unexpected upload host.' }
     $asset = Invoke-RestMethod -Uri $upload -Method Post -Headers $headers -ContentType 'application/octet-stream' -InFile $path -TimeoutSec 300
