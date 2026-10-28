@@ -51,7 +51,10 @@ internal static class Program
         }
         foreach (var q in new[] { "", "-1", "+1", "1,2", "1.", ".2", "1e3", "1 2", " 0" })
             Check(!PayloadValidator.Validate(Encode($"1*OEPSA010123*0926-TRAY-Q5R2*{q}")).Valid, "Reject invalid quantity");
-        Check(PayloadValidator.Validate("2*bad").Stage == "version", "Version gates all other validation");
+        Check(PayloadValidator.Validate("3*bad").Stage == "version", "Version gates all other validation");
+        Version2Checks.Run(Check);
+        CommandChecks.Run(Check);
+        SupplierChecks.Run(Check);
         Check(!PayloadValidator.Validate("1*OEPSA010123*0926-TRAY-Q5R2*0*01234567").Valid, "User placeholder is not a valid CRC");
         var body = "1*OEPSA010123*0926-TRAY-Q5R2*0";
         var encoded = Encode(body);
@@ -97,10 +100,10 @@ internal static class Program
         await Task.Delay(60);
         Check(!message.IsCompleted, "No greeting, metadata or history sent to new client");
         await using var sdk = new ScannerConnection();
-        var delivered = new TaskCompletionSource<LabelData>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var delivered = Channel.CreateUnbounded<LabelData>();
         var jsonMessages = Channel.CreateUnbounded<string>();
         sdk.JsonReceived += json => jsonMessages.Writer.TryWrite(json);
-        sdk.LabelReceived += data => delivered.TrySetResult(data);
+        sdk.LabelReceived += data => delivered.Writer.TryWrite(data);
         await sdk.ConnectAsync("ignored.invalid", host.Port, thisComputer: true, cancellationToken: timeout.Token);
         await Until(() => host.LabelClientCount == 2);
         Check(sdk.Connected, "This-computer option ignores the supplied IP and connects to loopback");
@@ -109,8 +112,29 @@ internal static class Program
         Check(packet?.Type == WebSocketMessageType.Text, "Plain JSON text message");
         var parsed = PayloadValidator.ReadClientJson(Encoding.UTF8.GetString(packet!.Bytes));
         Check(parsed == data, "Raw websocket has exactly the requested data");
-        Check(await delivered.Task.WaitAsync(timeout.Token) == data, "Shipping SDK reads new contract");
+        Check(await delivered.Reader.ReadAsync(timeout.Token) == data, "Shipping SDK reads new contract");
         Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == Encoding.UTF8.GetString(packet.Bytes), "JSON event exposes the exact server message");
+        host.PublishLabel(Version2Checks.Data);
+        Check(await delivered.Reader.ReadAsync(timeout.Token) == Version2Checks.Data, "Same SDK connection receives typed version 2 after version 1");
+        Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(Version2Checks.Data), "Version 2 JSON event preserves exactly five fields");
+        // Printable ASCII can expand when JSON-escaped; valid labels still fit the transport.
+        var escapedBody = "2*857*" + new string('<', 4000) + "*1923*OUT";
+        var escaped = PayloadValidator.Validate(Encode(escapedBody)).Data!;
+        host.PublishLabel(escaped);
+        Check(await delivered.Reader.ReadAsync(timeout.Token) == escaped, "Long escaped version 2 number survives network limits");
+        Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(escaped), "Escaped message arrives intact");
+        host.PublishLabel(data);
+        Check(await delivered.Reader.ReadAsync(timeout.Token) == data, "SDK switches back to version 1 without reconnecting");
+        Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(data), "Version 1 schema stays unchanged after version 2");
+        foreach (var additional in new[] { LabelData.FromCommand("For Odoo OUT"), LabelData.FromCommand("For Odoo OUT"),
+            LabelData.FromCommand(new string('<', 4085)), LabelData.FromRaw("C*Disable*00000000"),
+            LabelData.FromRaw(SupplierChecks.RawText), LabelData.FromSupplier(null, "74LVC4245AD,118", "200"),
+            LabelData.FromSupplier("OEPS070090", null, "195"), LabelData.FromRaw(new string('\x1d', 10000)) })
+        {
+            host.PublishLabel(additional);
+            Check(await delivered.Reader.ReadAsync(timeout.Token) == additional, "Same SDK connection accepts C, X and supplier fields without losing characters or repeated commands");
+            Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(additional), "Exact command/supplier/raw JSON received over real websocket");
+        }
         await sdk.CloseAsync();
         await Until(() => host.LabelClientCount == 1);
         Check(!sdk.Connected, "Close releases this client's connection");

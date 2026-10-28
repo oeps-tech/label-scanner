@@ -1,0 +1,20 @@
+[
+  {
+    "file": "01-valid.png",
+    "payload": "2*857*S/2680*1923*WH/OUT/00567*6B6312A1",
+    "expected": "VERSION 2",
+    "correct_checksum": "6B6312A1"
+  },
+  {
+    "file": "02-valid.png",
+    "payload": "2*858*S/2681*1924*WH/OUT/00568*C4197332",
+    "expected": "VERSION 2",
+    "correct_checksum": "C4197332"
+  },
+  {
+    "file": "03-invalid-checksum.png",
+    "payload": "2*859*S/2682*1925*WH/OUT/00569*6A5A82E0",
+    "expected": "RAW X: CRC-32 mismatch",
+    "correct_checksum": "6A5A82EC"
+  }
+]

@@ -8,6 +8,7 @@
     <ApplicationIcon>../../assets/app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="10.0.0" />
     <ProjectReference Include="../Scanner.Contracts/Scanner.Contracts.csproj" />
     <ProjectReference Include="../Scanner.Core/Scanner.Core.csproj" />
     <ProjectReference Include="../Scanner.Desktop/Scanner.Desktop.csproj" />

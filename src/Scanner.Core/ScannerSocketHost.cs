@@ -19,7 +19,9 @@ public sealed class ScannerSocketHost() : IAsyncDisposable
     private readonly ConcurrentDictionary<Guid, Peer> _labels = new();
     private WebApplication? _app;
     public int Port { get; private set; }
-    public int MaximumLabelBytes { get; init; } = 16 * 1024;
+    public bool IsRunning => _app is not null;
+    public int ClientQueueCapacity { get; init; } = 8;
+    public int MaximumLabelBytes { get; init; } = ProtocolJson.MaximumLabelBytes;
     public int MaximumClientMessageBytes { get; init; } = 64 * 1024;
     public TimeSpan SendTimeout { get; init; } = TimeSpan.FromSeconds(10);
     public int LabelClientCount => _labels.Count;
@@ -57,7 +59,7 @@ public sealed class ScannerSocketHost() : IAsyncDisposable
     {
         if (!context.WebSockets.IsWebSocketRequest) { context.Response.StatusCode = 400; return; }
         using var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-        using var peer = new Peer(socket);
+        using var peer = new Peer(socket, ClientQueueCapacity);
         var peers = _labels;
         var id = Guid.NewGuid(); peers[id] = peer; ClientsChanged?.Invoke();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, peer.Cancellation.Token);
@@ -107,10 +109,10 @@ public sealed class ScannerSocketHost() : IAsyncDisposable
         public WebSocket Socket { get; }
         public Channel<Packet> Pending { get; }
         public CancellationTokenSource Cancellation { get; } = new();
-        public Peer(WebSocket socket)
+        public Peer(WebSocket socket, int capacity)
         {
             Socket = socket;
-            Pending = Channel.CreateBounded<Packet>(new BoundedChannelOptions(8)
+            Pending = Channel.CreateBounded<Packet>(new BoundedChannelOptions(capacity)
             { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait });
         }
         public void Stop()

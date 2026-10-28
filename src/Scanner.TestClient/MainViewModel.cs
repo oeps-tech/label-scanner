@@ -8,6 +8,8 @@ using Scanner.Desktop;
 
 namespace Scanner.TestClient;
 
+public sealed record DisplayField(string Name, string Value);
+
 public sealed class MainViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly ScannerConnection _client = new();
@@ -21,6 +23,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private long _retryAt, _received;
     private string _host = "127.0.0.1", _status = "Disconnected", _json = "No data received", _pn = "—", _lot = "—", _quantity = "—", _version = "—";
     private int _port = 8765;
+    private IReadOnlyList<DisplayField> _fields = [];
+    public IReadOnlyList<DisplayField> Fields { get => _fields; private set => Set(ref _fields, value); }
     public string Host { get => _host; set => Set(ref _host, value); }
     public int Port { get => _port; set => Set(ref _port, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
@@ -61,7 +65,17 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public void Display(LabelData data)
     {
         Json = JsonSerializer.Serialize(data, new JsonSerializerOptions(ProtocolJson.Options) { WriteIndented = true });
-        LabelVersion = data.LabelVersion.ToString(); OepsPn = data.OepsPn; Lot = data.Lot; Quantity = data.Quantity;
+        LabelVersion = data.VersionText; OepsPn = data.OepsPn ?? "—"; Lot = data.Lot ?? "—"; Quantity = data.Quantity ?? "—";
+        Fields = data.LabelVersion switch
+        {
+            1 => [new("Label version", LabelVersion), new("OEPS PN", OepsPn), new("Lot", Lot), new("Quantity", Quantity)],
+            2 => [new("Label version", LabelVersion), new("Sales order ID", data.SalesOrderId!.Value.ToString()),
+                new("Document name", data.DocumentName!), new("OUT ID", data.OutId!.Value.ToString()), new("OUT number", data.OutNumber!)],
+            3 => [new("Label version", LabelVersion), new("OEPS PN", OepsPn), new("MPN", data.Mpn ?? "—"), new("Quantity", Quantity)],
+            LabelData.CommandVersion => [new("Label version", "C"), new("Command", data.Command!)],
+            LabelData.RawVersion => [new("Label version", "X"), new("Raw text", data.Raw!)],
+            _ => throw new InvalidDataException("Unsupported label version")
+        };
     }
     private async Task ConnectAsync()
     {

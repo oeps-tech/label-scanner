@@ -1,4 +1,4 @@
-param([string]$Version='0.1.0',[Parameter(Mandatory)][string]$ApplicationDirectory)
+param([string]$Version='0.2.0',[Parameter(Mandatory)][string]$ApplicationDirectory)
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $output = Join-Path $repo 'artifacts'
@@ -15,7 +15,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($zipPath)
 try {
     if ($archive.Entries | Where-Object { $_.FullName -match '/site-packages/(torch|transformers|tensorflow)' }) { throw 'Release contains legacy OCR libraries.' }
-    foreach ($name in @('Scanner.Server.dll','Scanner.TestClient.dll','Scanner.Core.dll','Scanner.Contracts.dll','Scanner.Client.dll','Scanner.Desktop.dll','Scanner.Updates.dll','docs/verification-results.md','worker/recognition/worker.py')) {
+    foreach ($name in @('Scanner.Server.dll','Scanner.TestClient.dll','Scanner.Core.dll','Scanner.Contracts.dll','Scanner.Client.dll','Scanner.Desktop.dll','Scanner.Updates.dll','System.IO.Ports.dll','docs/verification-results.md','worker/recognition/worker.py')) {
         $entry = $archive.GetEntry('app/' + $name)
         if (-not $entry) { throw "Release archive misses $name" }
         $stream = $entry.Open(); $sha = [Security.Cryptography.SHA256]::Create()

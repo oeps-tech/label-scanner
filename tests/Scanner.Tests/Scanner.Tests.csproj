@@ -3,6 +3,7 @@
   <ItemGroup><ProjectReference Include="../../src/Scanner.Core/Scanner.Core.csproj" /><ProjectReference Include="../../src/Scanner.Client/Scanner.Client.csproj" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../../src/Scanner.Updates/Scanner.Updates.csproj"/></ItemGroup>
   <ItemGroup>
+    <None Include="../fixtures/supplier-labels.json" Link="supplier-labels.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../src/Scanner.Server/Services/WorkerProcess.cs" Link="ShippingWorkerProcess.cs" />
     <Compile Include="../../src/Scanner.Server/Services/AppPaths.cs" Link="ShippingAppPaths.cs" />
   </ItemGroup>

@@ -1,5 +1,5 @@
 <Window x:Class="Scanner.Server.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:desktop="clr-namespace:Scanner.Desktop;assembly=Scanner.Desktop"
- Title="OEPS Scanner" Width="900" Height="350" WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
+ Title="OEPS Scanner" Width="900" Height="530" WindowStartupLocation="CenterScreen" Style="{StaticResource {x:Type Window}}">
  <Window.Resources><BooleanToVisibilityConverter x:Key="BooleanToVisibility"/></Window.Resources>
  <DockPanel><desktop:ReleaseFooter DockPanel.Dock="Bottom"/>
  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="16,12,16,4">
@@ -15,15 +15,40 @@
      <CheckBox Content="Show details (debug)" IsChecked="{Binding ShowDetails}" Margin="0"/>
     </StackPanel>
    </WrapPanel>
-   <TextBlock Text="{Binding CameraStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+   <DockPanel Margin="0,8,0,0">
+    <CheckBox DockPanel.Dock="Left" Content="Enable camera" IsChecked="{Binding CameraEnabled}" Margin="0,0,16,0"/>
+    <TextBlock Text="{Binding CameraStatus}" TextWrapping="Wrap"/>
+   </DockPanel>
+  </StackPanel></Border>
+  <Border x:Name="BarcodeReaderPanel" Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,10"><StackPanel>
+   <WrapPanel>
+    <TextBlock Text="Barcode reader" VerticalAlignment="Center" Margin="0,0,10,0"/>
+    <ComboBox x:Name="BarcodeReaderSelector" ItemsSource="{Binding BarcodeReaders}" SelectedItem="{Binding SelectedBarcodeReader}" DisplayMemberPath="DisplayName" IsEnabled="{Binding CanChooseBarcodeReader}" Width="350"
+              ToolTip="Paired outgoing Bluetooth SPP ports. Pair your reader in Windows first."/>
+    <Button Content="Refresh" Command="{Binding RefreshBarcodeReadersCommand}"/>
+    <Button Content="{Binding BarcodeReaderButtonText}" Command="{Binding ConnectBarcodeReaderCommand}" MinWidth="95"
+            ToolTip="Connecting manually enables the debug override. Active reader clients keep the connection open."/>
+   </WrapPanel>
+   <WrapPanel Margin="0,8,0,0">
+    <CheckBox Content="Keep reader connected (debug)" IsChecked="{Binding KeepBarcodeReaderConnected}" Margin="0,0,20,0"/>
+    <CheckBox Content="Fast scans (CR+LF)" IsChecked="{Binding BarcodeReaderFastScans}" IsEnabled="{Binding CanChooseBarcodeReader}"
+              ToolTip="Each CR+LF ends a scan immediately. Disable while disconnected to preserve embedded CR+LF using a quiet gap."/>
+   </WrapPanel>
+   <TextBlock Text="{Binding BarcodeReaderStatus}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+   <TextBlock Text="{Binding BarcodeReaderSetup}" TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0"/>
   </StackPanel></Border>
   <Border Background="White" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,10"><StackPanel>
-   <WrapPanel>
-    <TextBlock Text="WebSocket port" VerticalAlignment="Center" Margin="0,0,8,0"/>
-    <TextBox Text="{Binding Port}" Width="75"/>
-    <Button Content="Apply" Command="{Binding ApplyNetworkCommand}"/>
-    <TextBlock Text="{Binding ClientStatus}" VerticalAlignment="Center" Margin="12,0"/>
-   </WrapPanel>
+   <Grid>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="75"/><ColumnDefinition Width="105"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <TextBlock Text="Camera WebSocket" VerticalAlignment="Center"/>
+    <TextBox Grid.Column="1" Text="{Binding Port}"/>
+    <Button Grid.Column="2" Grid.RowSpan="2" Content="Apply ports" Command="{Binding ApplyNetworkCommand}" VerticalAlignment="Center"/>
+    <TextBlock Grid.Column="3" Text="{Binding ClientStatus}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0"/>
+    <TextBlock Grid.Row="1" Text="Reader WebSocket" VerticalAlignment="Center"/>
+    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding BarcodeReaderPort}"/>
+    <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding BarcodeReaderClientStatus}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0"/>
+   </Grid>
    <ItemsControl ItemsSource="{Binding Addresses}" FontSize="11" Margin="0,6,0,0"/>
   </StackPanel></Border>
   <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" Foreground="Firebrick" Margin="0,0,0,8">
@@ -42,9 +67,9 @@
     <DockPanel Margin="0,8,0,0"><CheckBox DockPanel.Dock="Right" Content="Enable camera preview" IsChecked="{Binding PreviewEnabled}"/><TextBlock Text="{Binding PreviewFps}"/></DockPanel>
    </StackPanel></Border>
    <Border Grid.Column="2" Background="White" Padding="12" BorderBrush="{StaticResource LineBrush}" BorderThickness="1"><StackPanel>
-    <TextBlock Text="Latest valid data" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
+    <TextBlock Text="Latest data" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
     <TextBox Text="{Binding LastJson, Mode=OneWay}" IsReadOnly="True" FontFamily="Consolas" FontSize="14" TextWrapping="Wrap" Height="220" VerticalScrollBarVisibility="Auto"/>
-    <TextBlock Text="Only these four fields are sent to clients. Version, field formats and CRC-32 must pass. Duplicate interval: 500 ms per payload." TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
+    <TextBlock Text="OEPS: versions 1/2. Commands: version C with CRC-32. Supplier version 3: valid quantity AND (valid OEPS PN OR nonempty MPN). Everything else: raw X. Camera: 500 ms duplicate filter. Barcode reader: every scan is sent, including duplicates." TextWrapping="Wrap" FontSize="12" Margin="0,10,0,0"/>
     <Button Content="Label versions &amp; JSON" Click="OpenLabelVersions" HorizontalAlignment="Left" Margin="0,12,0,0"/>
    </StackPanel></Border>
   </Grid>

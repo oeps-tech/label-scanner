@@ -1,0 +1,58 @@
+[
+  {
+    "supplier": "Worldway",
+    "raw": "{pbn:PICK2610150002,on:WM2610150052,pc:C38433,pm:INA826AIDR,qty:100,mc:OEPS080248 STIMJIM FILIPE,cc:1,pdi:242369319,hp:21,wc:ZH}",
+    "oeps_pn": "OEPS080248",
+    "mpn": "INA826AIDR",
+    "quantity": "100"
+  },
+  {
+    "supplier": "Farnell",
+    "raw": "[)><rs>06<gs>K20260626231606<gs>POEPS020225<gs>1PCRG0805F220R<gs>3P3399598<gs>Q210<gs>9D10D2425<gs>1T16020784<gs>4LTH<gs>4K2<rs><eot>",
+    "oeps_pn": "OEPS020225",
+    "mpn": "CRG0805F220R",
+    "quantity": "210"
+  },
+  {
+    "supplier": "Mouser 1",
+    "raw": "[)><rs>06<gs>K39997218<gs>14K001<gs>POEPS070090 #IA-1265<gs>Q195<gs>11K091714519<gs>4LJP<gs>1VHirose<rs><eot>",
+    "oeps_pn": "OEPS070090",
+    "mpn": null,
+    "quantity": "195"
+  },
+  {
+    "supplier": "Mouser 2",
+    "raw": "[)><rs>06<gs>K39197139<gs>14K001<gs>POEPS010015 0778 HUGO<gs>Q120<gs>11K090364700<gs>4LCN<gs>1VTAIYO YUDEN<rs><eot>",
+    "oeps_pn": "OEPS010015",
+    "mpn": null,
+    "quantity": "120"
+  },
+  {
+    "supplier": "Mouser 3",
+    "raw": "[)><rs>06<gs>K40764095<gs>14K001<gs>POEPS080249 FILIPE<gs>Q16<gs>11K093052208<gs>4LMY<gs>1VLattice<rs><eot>",
+    "oeps_pn": "OEPS080249",
+    "mpn": null,
+    "quantity": "16"
+  },
+  {
+    "supplier": "DigiKey old",
+    "raw": "[)><rs>06<gs>POEPS080055 STOCK RM<gs>1PAT25SF081B-SSHD-T<gs>30P1695-AT25SF081B-SSHD-TCT-ND<gs>K<gs>1K83146960<gs>10K99888410<gs>9D2239<gs>1TEHU032.53<gs>11K1<gs>4LPH<gs>Q26<gs>11ZPICK<gs>12Z18627676<gs>13Z999999<gs>20Z000000000000000000000000000000000000000000000000000000000000000",
+    "oeps_pn": "OEPS080055",
+    "mpn": "AT25SF081B-SSHD-T",
+    "quantity": "26"
+  },
+  {
+    "supplier": "DigiKey without OEPS",
+    "raw": "[)><rs>06<gs>P1727-6369-6-ND<gs>1P74LVC4245AD,118<gs>K<gs>1K69457592<gs>10K80715371<gs>11K1<gs>4LTH<gs>Q200<gs>11ZPICK<gs>12Z2763169<gs>13Z62474<gs>20Z0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "oeps_pn": null,
+    "mpn": "74LVC4245AD,118",
+    "quantity": "200"
+  },
+  {
+    "supplier": "DigiKey new",
+    "raw": "[)><rs>06<gs>POEPS080126 P-831 IA-1247<gs>1PSN74LVC4245APWR<gs>30P296-12183-1-ND<gs>K1234<gs>1K102248765<gs>10K134507062<gs>9D2625+5<gs>1T6475344ML6<gs>11K1<gs>4LMY<gs>Q3<gs>11ZPICK<gs>12Z413032<gs>13Z999999<gs>20Z0000000000000000000000000000000000000000000000000000000000000000000<rs><eot>",
+    "oeps_pn": "OEPS080126",
+    "mpn": "SN74LVC4245APWR",
+    "quantity": "3"
+  }
+]

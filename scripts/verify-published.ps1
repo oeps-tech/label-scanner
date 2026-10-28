@@ -33,8 +33,12 @@ New-Item -ItemType Directory -Force -Path $serverData | Out-Null
 $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
 $listener.Start()
 $smokePort = $listener.LocalEndpoint.Port
+$readerListener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
+$readerListener.Start()
+$readerSmokePort = $readerListener.LocalEndpoint.Port
+$readerListener.Stop()
 $listener.Stop()
-[IO.File]::WriteAllText((Join-Path $serverData 'settings.json'), ('{"port":' + $smokePort + '}'))
+[IO.File]::WriteAllText((Join-Path $serverData 'settings.json'), ('{"port":' + $smokePort + ',"barcode_reader_port":' + $readerSmokePort + ',"camera_enabled":false}'))
 $serverArguments = '--ui-smoke --data-dir "' + $serverData + '"'
 $serverProcess = Start-Process -FilePath (Join-Path $appDirectory 'Scanner.Server.exe') -ArgumentList $serverArguments -WorkingDirectory $appDirectory -WindowStyle Hidden -PassThru
 try {

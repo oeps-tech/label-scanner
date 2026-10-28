@@ -3,11 +3,13 @@ namespace Scanner.Core;
 // Monotonic milliseconds supplied by the caller make boundary behavior deterministic.
 public sealed class DuplicateGate
 {
+    // Camera only, for every current and future label version; keyed by the complete encoded payload.
+    public const int IntervalMilliseconds = 500;
     private readonly Dictionary<string, long> _lastSent = new(StringComparer.Ordinal);
-    public bool CanSend(string payload, long nowMs) => !_lastSent.TryGetValue(payload, out var last) || nowMs - last >= 500;
+    public bool CanSend(string payload, long nowMs) => !_lastSent.TryGetValue(payload, out var last) || nowMs - last >= IntervalMilliseconds;
     public void MarkSent(string payload, long nowMs)
     {
-        foreach (var expired in _lastSent.Where(p => nowMs - p.Value >= 500).Select(p => p.Key).ToArray()) _lastSent.Remove(expired);
+        foreach (var expired in _lastSent.Where(p => nowMs - p.Value >= IntervalMilliseconds).Select(p => p.Key).ToArray()) _lastSent.Remove(expired);
         _lastSent[payload] = nowMs;
     }
     public void Clear() => _lastSent.Clear();

@@ -7,6 +7,7 @@ Pinned build records: `global.json`, project `packages.lock.json`, `recognition/
 | Dependency | Purpose / upstream source |
 | --- | --- |
 | .NET 10 / WPF / ASP.NET Core | Desktop runtime and listener; [dotnet source and licensing](https://github.com/dotnet/runtime) and [WPF](https://github.com/dotnet/wpf). |
+| System.IO.Ports 10.0.0 | Bluetooth serial port connection; MIT, [dotnet runtime source](https://github.com/dotnet/runtime/tree/main/src/libraries/System.IO.Ports). |
 | Python 3.12.10 | Bundled worker runtime; [Python license](https://docs.python.org/3/license.html). |
 | OpenCV 4.12.0.88 | Camera capture and preview resizing; Apache-2.0 upstream plus distribution third-party notices in [opencv-python](https://github.com/opencv/opencv-python). |
 | zxing-cpp 2.3.0 | Data Matrix decoding; Apache-2.0, [upstream](https://github.com/zxing-cpp/zxing-cpp). |

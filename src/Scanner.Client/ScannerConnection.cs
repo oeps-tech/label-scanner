@@ -14,10 +14,11 @@ public sealed class ScannerConnection : IAsyncDisposable
     private bool _disposed;
     public bool Connected => _socket?.State == WebSocketState.Open;
     /// <summary>
-    /// Raised once per valid server message with the original JSON, including quantity as a string.
+    /// Raised once per well-formed server message with the original JSON. Versions 1/2/3/C are structured; X carries unvalidated raw text.
     /// Subscribe before connecting. Handlers run on the receive loop; keep them short and marshal UI updates.
     /// </summary>
     public event Action<string>? JsonReceived;
+    /// <summary>Versions 1/2/3/C or raw X. Check IsCommand, IsRaw or LabelVersion before reading version-specific fields.</summary>
     public event Action<LabelData>? LabelReceived;
     public event Action<string>? StateChanged;
     /// <summary>Connects to the server at the given IP/host and port, or to this computer.</summary>
@@ -56,7 +57,7 @@ public sealed class ScannerConnection : IAsyncDisposable
     {
         try
         {
-            while (await WebSocketMessages.ReceiveAsync(socket, 16 * 1024, ct).ConfigureAwait(false) is { } message)
+            while (await WebSocketMessages.ReceiveAsync(socket, ProtocolJson.MaximumLabelBytes, ct).ConfigureAwait(false) is { } message)
             {
                 if (message.Type != WebSocketMessageType.Text) throw new InvalidDataException("Expected data JSON text");
                 var json = Encoding.UTF8.GetString(message.Bytes);

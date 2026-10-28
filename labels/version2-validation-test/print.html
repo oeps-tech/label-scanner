@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<title>OEPS Scanner: version 2 validation test</title><style>
+@page {size:A4 landscape; margin:12mm} body {font:14px Arial,sans-serif;color:#000;background:#fff;margin:0}
+h1 {font-size:22px} main {display:flex;gap:5mm} article {border:1px solid #bbb;padding:4mm;flex:1;min-width:0;break-inside:avoid}
+h2 {font-size:16px} img {display:block;width:48mm;height:auto;margin:3mm auto;image-rendering:pixelated}
+.payload {display:block;overflow-wrap:anywhere;font-size:12px} p {line-height:1.5}
+</style><h1>OEPS Scanner — two valid labels, one raw X fallback</h1>
+<p>Test data with illustrative Odoo IDs. All three symbols decode; labels 1 and 2 produce version 2, while label 3 produces raw X.</p><main><article><h2>Label 1: VERSION 2</h2><img src="01-valid.png" alt="Data Matrix label 1"><p>Document: S/2680<br>OUT: WH/OUT/00567<br>SO ID: 857; OUT ID: 1923</p><p>Printed CRC: <code>6B6312A1</code><br>Correct CRC: <code>6B6312A1</code></p><code class="payload">2*857*S/2680*1923*WH/OUT/00567*6B6312A1</code></article><article><h2>Label 2: VERSION 2</h2><img src="02-valid.png" alt="Data Matrix label 2"><p>Document: S/2681<br>OUT: WH/OUT/00568<br>SO ID: 858; OUT ID: 1924</p><p>Printed CRC: <code>C4197332</code><br>Correct CRC: <code>C4197332</code></p><code class="payload">2*858*S/2681*1924*WH/OUT/00568*C4197332</code></article><article><h2>Label 3: RAW X: CRC-32 mismatch</h2><img src="03-invalid-checksum.png" alt="Data Matrix label 3"><p>Document: S/2682<br>OUT: WH/OUT/00569<br>SO ID: 859; OUT ID: 1925</p><p>Printed CRC: <code>6A5A82E0</code><br>Correct CRC: <code>6A5A82EC</code></p><code class="payload">2*859*S/2682*1925*WH/OUT/00569*6A5A82E0</code></article></main><p>Label 3 changes only the last checksum character. Server diagnostics should report
+“Raw X” with a CRC-32 mismatch reason. Clients requiring validated data should ignore X.
+Every label version remaining visible can be sent again every 500 ms.
+Print at 100% / actual size with no headers or footers. Preserve the white border around each symbol.</p></html>

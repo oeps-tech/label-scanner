@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 from pathlib import Path
 import queue
@@ -25,15 +26,45 @@ def symbol(text, format=zxingcpp.BarcodeFormat.DataMatrix):
     return np.asarray(zxingcpp.write_barcode(format,text,width=280,height=280,quiet_zone=12))
 
 class ScannerTests(unittest.TestCase):
-    def test_multiple_datamatrix_no_qr_or_aruco(self):
+    def test_mixed_label_versions(self):
+        order = '2*857*S/2680*1923*WH/OUT/00567*6B6312A1'
+        canvas = np.full((520, 1000), 255, np.uint8)
+        for x, text in zip((15, 515), (payload(), order)):
+            code = symbol(text)
+            canvas[40:40+code.shape[0], x:x+code.shape[1]] = code
+        for image in (canvas, cv2.rotate(canvas, cv2.ROTATE_90_CLOCKWISE)):
+            codes, _ = decode_frame(image)
+            self.assertEqual({c['raw'] for c in codes}, {payload(), order})
+
+    def test_multiple_datamatrix_and_qr(self):
         canvas=np.full((520,1500),255,np.uint8)
-        for x,code in zip((15,515,1015),(symbol(payload()),symbol(payload('123.45')),symbol('ignore QR',zxingcpp.BarcodeFormat.QRCode))):
+        for x,code in zip((15,515,1015),(symbol(payload()),symbol(payload('123.45')),symbol('raw QR',zxingcpp.BarcodeFormat.QRCode))):
             canvas[40:40+code.shape[0],x:x+code.shape[1]]=code
         codes,elapsed=decode_frame(canvas)
-        self.assertEqual({c['raw'] for c in codes},{payload(),payload('123.45')})
+        self.assertEqual({c['raw'] for c in codes},{payload(),payload('123.45'),'raw QR'})
         self.assertGreater(elapsed,0)
         codes,_=decode_frame(cv2.rotate(canvas,cv2.ROTATE_90_CLOCKWISE))
-        self.assertEqual({c['raw'] for c in codes},{payload(),payload('123.45')})
+        self.assertEqual({c['raw'] for c in codes},{payload(),payload('123.45'),'raw QR'})
+
+    def test_supplier_symbols_and_control_characters(self):
+        fixtures = json.loads((Path(__file__).resolve().parents[2] / 'tests/fixtures/supplier-labels.json').read_text())
+        for sample in fixtures:
+            with self.subTest(supplier=sample['supplier']):
+                text = sample['raw'].replace('<rs>', '\x1e').replace('<gs>', '\x1d').replace('<eot>', '\x04')
+                codes, _ = decode_frame(symbol(text))
+                self.assertEqual([c['raw'] for c in codes], [text])
+
+    def test_raw_unicode_controls_and_other_formats(self):
+        raw = '\t OEPS-1234\r\nnext\nline\r\0\x1d\x1e\x04 * <gs> café € 漢字 😀 '
+        for format in (zxingcpp.BarcodeFormat.DataMatrix, zxingcpp.BarcodeFormat.QRCode, zxingcpp.BarcodeFormat.Aztec):
+            with self.subTest(format=format):
+                codes, _ = decode_frame(symbol(raw, format))
+                self.assertEqual([c['raw'] for c in codes], [raw])
+                stream = io.BytesIO(); Writer(stream).send({'codes': codes}); stream.seek(0)
+                self.assertEqual(read_message(stream)['codes'][0]['raw'], raw)
+        code = np.asarray(zxingcpp.write_barcode(zxingcpp.BarcodeFormat.Code128, 'OEPS-1234', width=600, height=180, quiet_zone=20))
+        codes, _ = decode_frame(code)
+        self.assertEqual([c['raw'] for c in codes], ['OEPS-1234'])
 
     def test_preview_does_not_wait_for_decode(self):
         worker=Worker(); image=np.full((480,640,3),255,np.uint8)

@@ -1,6 +1,6 @@
 # Build, installation and updates
 
-Windows x64 is the supported desktop target. Both GUIs show v0.1.0. The SDK is pinned to .NET 10.0.400 (LTS); `scripts/setup.ps1` verifies the official SDK archive's SHA-512 before extraction. .NET dependency lock files are checked in. See `recognition/requirements.lock` for Python versions.
+Windows x64 is the supported desktop target. Both GUIs show v0.2.0. The SDK is pinned to .NET 10.0.400 (LTS); `scripts/setup.ps1` verifies the official SDK archive's SHA-512 before extraction. .NET dependency lock files are checked in. See `recognition/requirements.lock` for Python versions.
 
 From the repository:
 
@@ -18,10 +18,10 @@ No OCR/model provisioning is required. The worker uses only OpenCV, NumPy and ZX
 To create release artifacts:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File scripts/package.ps1 -Version 0.2.0
 ```
 
-The package command runs tests, publishes both WPF applications, bundles a clean Python worker containing only the locked decoder distributions, creates `artifacts/OEPS.Scanner-0.1.0-win-x64.zip` plus SHA-256, builds `artifacts/OEPS.Scanner-0.1.0-setup-win-x64.msi` plus SHA-256, and packs the independent client DLL ZIP and NuGet libraries. `-WorkerDirectory` accepts a previously packaged worker. `-SkipMsi` makes the app update ZIP and SDK artifacts; that app ZIP requires the .NET 10 Desktop and ASP.NET runtimes from a full installation. `-SkipTests` is available only after tests were already run and is recorded in the release handoff.
+The package command runs tests, publishes both WPF applications, bundles a clean Python worker containing only the locked decoder distributions, creates `artifacts/OEPS.Scanner-0.2.0-win-x64.zip` plus SHA-256, builds `artifacts/OEPS.Scanner-0.2.0-setup-win-x64.msi` plus SHA-256, and packs the independent client DLL ZIP and NuGet libraries. `-WorkerDirectory` accepts a previously packaged worker. `-SkipMsi` makes the app update ZIP and SDK artifacts; that app ZIP requires the .NET 10 Desktop and ASP.NET runtimes from a full installation. `-SkipTests` is available only after tests were already run and is recorded in the release handoff.
 
 Install the MSI for a complete per-user runtime distribution. No administrator, SDK, Python package installation or developer tools are required for operators. The installer creates separate desktop and Start menu shortcuts for OEPS Scanner Server and OEPS Scanner Test Client. The staged `full-installer` folder can also be copied intact and launched with `launcher/Scanner.Launcher.exe --install-package <full-path-to-ZIP>` (add `--app TestClient` for the client).
 

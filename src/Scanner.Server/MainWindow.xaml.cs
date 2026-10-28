@@ -37,7 +37,7 @@ public partial class MainWindow : Window
                     var image = new RenderTargetBitmap((int)content.ActualWidth, (int)content.ActualHeight, 96, 96, PixelFormats.Pbgra32); image.Render(content);
                     var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
                     using (var output = File.Create(Path.Combine(paths.Root, "server-ui-smoke.png"))) encoder.Save(output);
-                    await File.WriteAllTextAsync(Path.Combine(paths.Root, "server-ui-smoke.txt"), $"PASS: WPF window loaded; dimensions {ActualWidth} x {ActualHeight}; camera disconnected; Data Matrix only; no preloaded event.\n");
+                    await File.WriteAllTextAsync(Path.Combine(paths.Root, "server-ui-smoke.txt"), $"PASS: WPF window loaded; dimensions {ActualWidth} x {ActualHeight}; camera disconnected; barcode scanning; no preloaded event.\n");
                 }
                 catch (Exception ex) { await File.WriteAllTextAsync(Path.Combine(paths.Root, "server-ui-smoke.txt"), "FAIL: " + ex); Environment.ExitCode = 1; }
                 Close();
@@ -75,8 +75,8 @@ public partial class MainWindow : Window
                 if (!bounds.IsEmpty) { _detailsWidth = bounds.Width; _detailsHeight = bounds.Height; }
             }
             WindowState = WindowState.Normal;
-            MinWidth = 900; MinHeight = 350;
-            MaxWidth = Width = 900; MaxHeight = Height = 350;
+            MinWidth = 900; MinHeight = 530;
+            MaxWidth = Width = 900; MaxHeight = Height = 530;
             ResizeMode = ResizeMode.CanMinimize;
         }
         if (!previousBounds.IsEmpty)

@@ -1,4 +1,4 @@
-"""In-memory Data Matrix reader. Capture, decode and preview have bounded latest-frame slots."""
+"""In-memory barcode reader. Capture, decode and preview have bounded latest-frame slots."""
 import base64
 from collections import deque
 from datetime import datetime, timezone
@@ -38,9 +38,10 @@ def jpeg(frame):
 def decode_frame(frame):
     started = time.perf_counter()
     codes = []
-    for code in zxingcpp.read_barcodes(frame, formats=zxingcpp.BarcodeFormat.DataMatrix, try_rotate=True, try_downscale=True):
-        # Validate the decoded ASCII bytes in the server. No OCR, correction or rewriting.
-        codes.append({'raw':bytes(code.bytes).decode('ascii', errors='replace')})
+    for code in zxingcpp.read_barcodes(frame, text_mode=zxingcpp.TextMode.Plain, try_rotate=True, try_downscale=True):
+        # Plain mode preserves controls and decodes text using ECI/charset information.
+        # HRI would replace separators with display tokens; ASCII replacement would destroy Unicode.
+        codes.append({'raw':code.text})
         if len(codes) >= 64:
             break
     return codes, (time.perf_counter()-started)*1000
@@ -71,7 +72,7 @@ class Worker:
     def run(self):
         threads = [threading.Thread(target=target, daemon=True) for target in (self.read_commands,self.output,self.decode,self.preview)]
         for thread in threads: thread.start()
-        self.status('ready', 'Data Matrix worker ready; no OCR models or image storage.')
+        self.status('ready', 'Barcode worker ready; no OCR models or image storage.')
         try:
             while not self.stop.is_set():
                 try:
