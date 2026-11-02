@@ -26,6 +26,21 @@ Command labels use `C*<command>*<checksum>`. For example, scan `C*For Odoo OUT*1
 
 For labels with embedded CR+LF, disconnect reader clients and the reader, then disable **Fast scans**. Multiline mode accepts CR or CR+LF suffixes, preserves internal and original trailing newlines, and completes a terminated burst after 250 ms of silence. Unterminated chunks are retained for up to five idle seconds. Leave at least 250 ms between scans in this mode; adjacent scans can otherwise merge, and a pause after an embedded ending can resemble a scan boundary. Arbitrary binary framing requires a device protocol with length or escaping. The application cannot recover characters already transformed by the reader.
 
-Discovery uses Windows outgoing SPP service identities and the current COM map. Incoming/non-SPP ports are excluded; SPP compatibility alone does not prove a device is a barcode reader. The saved identity is resolved again before opening, allowing COM reassignment. The port opens exclusively; an occupied port fails visibly. Bluetooth loss detection depends on the Windows serial driver.
+Discovery uses Windows outgoing SPP service identities and the current COM map. Incoming/non-SPP ports are excluded; SPP compatibility alone does not prove a device is a barcode reader. The saved identity is resolved again before opening, allowing COM reassignment. The port opens exclusively; an occupied port fails visibly.
+
+### Bluetooth connection status (v0.2.1)
+
+While the COM port is open, the reader worker checks Windows' connection flag for that reader's Bluetooth address immediately and then every **two seconds**. It does not initiate device discovery inquiries or send commands to the reader. The status means:
+
+- **Connecting…**: opening the serial connection.
+- **Connected**: the COM port is open and Windows reports a Bluetooth connection.
+- **COM open — reader status unknown**: the serial connection is open, but Windows cannot supply a usable Bluetooth status. Reading continues; this is not treated as a disconnect.
+- **COM open — checking Bluetooth connection**: Windows reported disconnected once; the next check confirms or clears it.
+- **Reader disconnected — retrying in 5 s**: connection loss was detected while a reader client or the debug override still requests the reader.
+- **Disconnected**: the reader is closed and there is no active connection request.
+
+Two consecutive explicit disconnected results close and release the COM port. A connected or unknown result resets that count. Serial read errors or a closed stream also release the port. Partial scans are discarded and cannot be joined to a later connection's data. Reconnection is attempted every **five seconds** while a reader client remains connected or **Keep reader connected (debug)** is enabled. It stops when neither requests the reader. The client WebSocket stays connected throughout, allowing scans to resume without reconnecting the application.
+
+No scans, read timeouts, and time since the last scan are **not** evidence of Bluetooth loss. An idle reader can remain connected indefinitely while requested. Scan and idle-countdown messages retain the underlying Bluetooth status. Windows may report a power-off or loss of range late; the two-second check cannot detect it before Windows does. Simulated checks cover the software transitions, and the user reported improved reader behaviour. Reporting delays and reconnection should still be checked on each deployed adapter/reader setup. This monitor is included in v0.2.1; update older installations to use it.
 
 Camera readings retain the **500 ms per-payload duplicate filter**, for every version including X. Reader scans bypass that filter completely in both modes. No source adds a replay backlog for absent clients. Restart local applications after updating the code.

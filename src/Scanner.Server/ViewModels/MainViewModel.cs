@@ -41,6 +41,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private bool _readerConnected, _readerPending, _refreshingReaders;
     private BarcodeReaderChoice? _selectedReader;
     private string _readerStatus = "Disconnected";
+    private string _readerConnectionStatus = "Disconnected";
+    private string? _readerLastScan, _readerFailure;
     private long _readerRetryAt;
     private bool _readerLastHadClients;
     private long _generation, _retryAt, _fpsStarted = Stopwatch.GetTimestamp(), _lastPreview;
@@ -60,6 +62,7 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     public string Notice { get => _notice; private set => Set(ref _notice, value); }
     public string CameraStatus { get => _cameraStatus; private set => Set(ref _cameraStatus, value); }
     public string BarcodeReaderStatus { get => _readerStatus; private set => Set(ref _readerStatus, value); }
+    private bool HasReaderDemand => _readerSockets.LabelClientCount > 0 || KeepBarcodeReaderConnected;
     public bool CanChooseBarcodeReader => !_readerConnected && !_readerPending && !_refreshingReaders;
     public string BarcodeReaderButtonText => _readerPending ? "Connecting…" : _readerConnected ? "Disconnect" : "Connect";
     public bool BarcodeReaderFastScans
@@ -320,17 +323,18 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             var now = _readerClock();
             var wanted = _readerDemand.ShouldConnect(_readerSockets.LabelClientCount, KeepBarcodeReaderConnected,
                 _readerConnected || _readerPending, now);
-            if (wanted && !_readerConnected && !_readerPending && now >= _readerRetryAt)
+            // Idle grace keeps an open COM session alive; only clients/debug can reopen a lost one.
+            if (HasReaderDemand && !_readerConnected && !_readerPending && now >= _readerRetryAt)
             {
                 if (SelectedBarcodeReader is null) { BarcodeReaderStatus = "A reader is required · select a paired Bluetooth reader"; return; }
                 try { await ConnectReaderAsync(); }
-                catch (Exception ex) { _readerConnected = false; BarcodeReaderStatus = "Could not connect · " + ex.Message + " · retrying in 5 s"; }
-                finally { _readerRetryAt = _readerClock() + 5000; }
+                catch (Exception ex) { _readerConnected = false; _readerFailure = ex.Message; }
+                finally { _readerRetryAt = _readerClock() + 5000; ShowReaderStatus(); }
             }
             else if (!wanted && _readerConnected) await DisconnectReaderAsync();
             else if (_readerConnected && _readerSockets.LabelClientCount == 0 && !KeepBarcodeReaderConnected)
-                BarcodeReaderStatus = $"No clients · reader closes in {_readerDemand.IdleSecondsRemaining(now)} s";
-            else if (_readerConnected && BarcodeReaderStatus.StartsWith("No clients")) BarcodeReaderStatus = "Connected · waiting for a scan";
+                ShowReaderStatus();
+            else if ((_readerConnected && BarcodeReaderStatus.StartsWith("No clients")) || (!_readerConnected && _readerFailure is not null)) ShowReaderStatus();
         }
         finally { _readerGate.Release(); }
     }
@@ -339,12 +343,12 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         _readerConnected = false; _readerPending = true; UpdateReaderControls();
         BarcodeReaderStatus = "Disconnecting…";
         try { await _reader.DisconnectAsync(); }
-        finally { _readerPending = false; UpdateReaderControls(); }
+        finally { _readerPending = false; ShowReaderStatus(); UpdateReaderControls(); }
     }
     private async Task ConnectReaderAsync()
     {
         if (SelectedBarcodeReader is not { } selected) return;
-        _readerPending = true; UpdateReaderControls(); BarcodeReaderStatus = "Connecting… · wake the reader if it is asleep";
+        _readerPending = true; _readerLastScan = null; UpdateReaderControls(); BarcodeReaderStatus = "Connecting… · wake the reader if it is asleep";
         try
         {
             // Resolve the saved device again instead of opening a stale COM number
@@ -367,10 +371,39 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
     private void ReaderStatusChanged(bool connected, string status) => _ui.Invoke(() =>
     {
         if (_disposed) return;
-        _readerConnected = connected; BarcodeReaderStatus = status;
-        if (!connected) _readerRetryAt = _readerClock() + 5000;
+        _readerConnected = connected; _readerConnectionStatus = status;
+        if (connected) _readerFailure = null;
+        else
+        {
+            const string failurePrefix = "Reader disconnected · ";
+            _readerLastScan = null;
+            _readerFailure = status == "Disconnected" ? null : status.StartsWith(failurePrefix, StringComparison.Ordinal) ? status[failurePrefix.Length..] : status;
+            _readerRetryAt = _readerClock() + 5000;
+        }
+        ShowReaderStatus();
         UpdateReaderControls();
     });
+    private void ShowReaderStatus()
+    {
+        if (_readerConnected)
+        {
+            var status = _readerConnectionStatus;
+            if (_readerLastScan is not null)
+            {
+                const string waiting = " · waiting for a scan";
+                if (status.EndsWith(waiting, StringComparison.Ordinal)) status = status[..^waiting.Length];
+                status += " · " + _readerLastScan;
+            }
+            if (!HasReaderDemand) status = $"No clients · reader closes in {_readerDemand.IdleSecondsRemaining(_readerClock())} s · " + status;
+            BarcodeReaderStatus = status;
+        }
+        else if (!_readerPending)
+        {
+            var seconds = Math.Max(1, (int)Math.Ceiling((_readerRetryAt - _readerClock()) / 1000.0));
+            BarcodeReaderStatus = HasReaderDemand && _readerFailure is not null
+                ? $"Reader disconnected — retrying in {seconds} s · {_readerFailure}" : "Disconnected";
+        }
+    }
     private void ReaderDiagnostic(string message) => _ui.Invoke(() => { if (!_disposed) BarcodeReaderStatus = message; });
     private void ReaderScanReceived(string raw) => _ui.Invoke(() =>
     {
@@ -378,7 +411,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
         try
         {
             Diagnostics.Clear(); ProcessDecodedPayload(raw, fromReader: true); Raise(nameof(Counters));
-            BarcodeReaderStatus = $"Connected · last scan {DateTime.Now:HH:mm:ss} · {raw.Length} characters";
+            _readerLastScan = $"last scan {DateTime.Now:HH:mm:ss} · {raw.Length} characters";
+            ShowReaderStatus();
         }
         catch (Exception ex) { BarcodeReaderStatus = "Reader scan could not be sent · " + ex.Message; }
     });

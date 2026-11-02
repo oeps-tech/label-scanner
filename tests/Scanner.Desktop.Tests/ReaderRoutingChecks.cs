@@ -143,6 +143,70 @@ internal static class ReaderRoutingChecks
         finally { cameraClient.Abort(); readerClient.Abort(); secondReader.Abort(); Pump(model.DisposeAsync().AsTask()); }
         check(fake.Disposed && !camera.IsRunning && !reader.IsRunning, "Shutdown disposes reader and both listeners");
         VerifyReaderOnlyAndMigration(check);
+        VerifyConnectionStateDisplay(check);
+    }
+    private static void VerifyConnectionStateDisplay(Action<bool, string> check)
+    {
+        const string unknown = "COM open — reader status unknown · Reader — COM7";
+        const string checking = "COM open — checking Bluetooth connection · Reader — COM7";
+        var paths = new AppPaths(["--data-dir", Path.Combine(Path.GetTempPath(), "oeps-reader-status-" + Guid.NewGuid().ToString("N"))]);
+        File.WriteAllText(paths.SettingsFile, ProtocolJson.Serialize(new ServerSettings { CameraEnabled = false }));
+        var selected = new BarcodeReaderChoice("reader", "Reader", "COM7");
+        var fake = new FakeReader { OpenStatus = unknown }; long now = 1000;
+        var model = new MainViewModel(paths, fake, () => new[] { selected }, () => now);
+        var reader = (ScannerSocketHost)Field(model, "_readerSockets");
+        using var firstClient = new ClientWebSocket(); using var secondClient = new ClientWebSocket();
+        using var timeout = new CancellationTokenSource(10000);
+        try
+        {
+            reader.StartAsync(0).GetAwaiter().GetResult();
+            typeof(MainViewModel).GetField("_initialized", Private)!.SetValue(model, true);
+            Execute(model.RefreshBarcodeReadersCommand);
+            Connect(firstClient, reader.Port, timeout.Token); Until(() => fake.Opens == 1); Step();
+            check(model.BarcodeReaderStatus == unknown && model.BarcodeReaderButtonText == "Disconnect",
+                "An open COM session with unknown Bluetooth status is usable without claiming Connected");
+            fake.Emit("first");
+            check(Receive(firstClient, timeout.Token) == LabelData.FromRaw("first") && model.BarcodeReaderStatus.StartsWith(unknown)
+                && model.BarcodeReaderStatus.Contains("last scan"), "A scan keeps unknown Bluetooth status while adding scan details");
+            now += 120000; Update(model);
+            check(fake.Opens == 1 && fake.Disconnects == 0 && model.BarcodeReaderStatus.StartsWith(unknown),
+                "No-scan age is not interpreted as a Bluetooth disconnection");
+            fake.ReportStatus(true, checking); fake.Emit("checking");
+            check(Receive(firstClient, timeout.Token) == LabelData.FromRaw("checking") && model.BarcodeReaderStatus.StartsWith(checking),
+                "A first negative Bluetooth observation remains visible after receiving a scan");
+            fake.ReportStatus(true, "Connected · Reader — COM7 · waiting for a scan");
+            check(model.BarcodeReaderStatus.StartsWith("Connected · Reader") && !model.BarcodeReaderStatus.Contains("waiting for a scan"),
+                "Confirmed Bluetooth status is displayed without stale waiting text after a scan");
+            fake.ReportStatus(true, unknown);
+            firstClient.Abort(); Until(() => reader.LabelClientCount == 0 && model.BarcodeReaderStatus.StartsWith("No clients"));
+            check(model.BarcodeReaderStatus.Contains(unknown), "Idle grace displays the actual Bluetooth status alongside its countdown");
+            Connect(secondClient, reader.Port, timeout.Token); Until(() => reader.LabelClientCount == 1 && !model.BarcodeReaderStatus.StartsWith("No clients"));
+            check(fake.Opens == 1 && model.BarcodeReaderStatus.StartsWith(unknown), "Returning clients restore unknown status without inventing Connected");
+
+            var pending = WebSocketMessages.ReceiveAsync(secondClient, ProtocolJson.MaximumLabelBytes, timeout.Token);
+            fake.LoseConnection();
+            check(model.BarcodeReaderStatus.Contains("Reader disconnected — retrying in 5 s") && model.BarcodeReaderStatus.Contains("Bluetooth connection lost"),
+                "Confirmed loss displays the retry delay and reason");
+            check(secondClient.State == WebSocketState.Open && reader.LabelClientCount == 1 && !pending.IsCompleted,
+                "Bluetooth loss leaves the existing client WebSocket open");
+            now += 4999; Update(model); check(fake.Opens == 1, "Bluetooth retry waits until five seconds");
+            now++; Update(model); check(fake.Opens == 2, "Bluetooth reader reconnects without the client reconnecting");
+            fake.Emit("after-return");
+            var result = pending.GetAwaiter().GetResult()!;
+            check(PayloadValidator.ReadClientJson(Encoding.UTF8.GetString(result.Bytes)) == LabelData.FromRaw("after-return")
+                && secondClient.State == WebSocketState.Open, "The same WebSocket receives the next scan after reader recovery");
+
+            secondClient.Abort(); Until(() => reader.LabelClientCount == 0 && model.BarcodeReaderStatus.StartsWith("No clients"));
+            fake.LoseConnection(); now += 10000; Update(model);
+            check(fake.Opens == 2 && model.BarcodeReaderStatus == "Disconnected",
+                "A Bluetooth loss during idle grace does not reopen the reader without clients or debug demand");
+            model.KeepBarcodeReaderConnected = true; Until(() => fake.Opens == 3); Step();
+            fake.LoseConnection(); now += 5000; Update(model);
+            check(fake.Opens == 4 && model.BarcodeReaderStatus.StartsWith(unknown), "Debug override retries Bluetooth without clients");
+            fake.LoseConnection(); model.KeepBarcodeReaderConnected = false; Step(); now += 10000; Update(model);
+            check(fake.Opens == 4 && model.BarcodeReaderStatus == "Disconnected", "Removing debug demand cancels further reconnect attempts");
+        }
+        finally { firstClient.Abort(); secondClient.Abort(); Pump(model.DisposeAsync().AsTask()); }
     }
     private static void VerifyReaderOnlyAndMigration(Action<bool, string> check)
     {
@@ -209,17 +273,19 @@ internal static class ReaderRoutingChecks
         public BarcodeReaderChoice? Opened { get; private set; }
         public bool Disposed { get; private set; }
         public bool FailOpen { get; set; }
+        public string OpenStatus { get; set; } = "Connected";
         public bool FastScans { get; private set; }
         public int Opens { get; private set; }
         public int Disconnects { get; private set; }
         public Task ConnectAsync(BarcodeReaderChoice reader, bool fastScans = true)
         {
             if (FailOpen) throw new IOException("Port busy");
-            Opened = reader; FastScans = fastScans; Opens++; StatusChanged?.Invoke(true, "Connected"); return Task.CompletedTask;
+            Opened = reader; FastScans = fastScans; Opens++; StatusChanged?.Invoke(true, OpenStatus); return Task.CompletedTask;
         }
         public Task DisconnectAsync() { Disconnects++; StatusChanged?.Invoke(false, "Disconnected"); return Task.CompletedTask; }
         public void Emit(string raw) => ScanReceived?.Invoke(raw);
-        public void LoseConnection() => StatusChanged?.Invoke(false, "Connection lost");
+        public void LoseConnection() => StatusChanged?.Invoke(false, "Reader disconnected · Bluetooth connection lost");
+        public void ReportStatus(bool connected, string status) => StatusChanged?.Invoke(connected, status);
         public void ReportError(string error) => Diagnostic?.Invoke(error);
         public ValueTask DisposeAsync() { Disposed = true; return ValueTask.CompletedTask; }
     }

@@ -12,15 +12,34 @@ public interface IBarcodeReaderConnection : IAsyncDisposable
     Task DisconnectAsync();
 }
 
+/// <summary>The synchronous serial operations owned by a single reader session.</summary>
+public interface IBarcodeSerialPort : IDisposable
+{
+    void Open();
+    int Read(byte[] buffer, int offset, int count);
+}
+
 public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
 {
+    public const int BluetoothCheckIntervalMs = 2000;
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly IBluetoothConnectionProbe _bluetooth;
+    private readonly Func<BarcodeReaderChoice, IBarcodeSerialPort> _portFactory;
+    private readonly Func<long> _clock;
     private CancellationTokenSource? _stop;
     private Task? _session;
     private bool _disposed;
     public event Action<string>? ScanReceived;
     public event Action<bool, string>? StatusChanged;
     public event Action<string>? Diagnostic;
+
+    public BarcodeReaderConnection(IBluetoothConnectionProbe? bluetooth = null,
+        Func<BarcodeReaderChoice, IBarcodeSerialPort>? portFactory = null, Func<long>? clock = null)
+    {
+        _bluetooth = bluetooth ?? new WindowsBluetoothConnectionProbe();
+        _portFactory = portFactory ?? (reader => new ReaderSerialPort(reader.PortName));
+        _clock = clock ?? (() => Environment.TickCount64);
+    }
 
     public async Task ConnectAsync(BarcodeReaderChoice reader, bool fastScans = true)
     {
@@ -44,19 +63,43 @@ public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
     {
         try
         {
-            using var port = new SerialPort(reader.PortName, 9600, Parity.None, 8, StopBits.One)
-            {
-                Handshake = Handshake.None, ReadTimeout = 50, WriteTimeout = 1000,
-                DiscardNull = false, ReadBufferSize = 65536
-            };
+            using var port = _portFactory(reader);
             port.Open(); // Windows opens exclusively; an occupied port fails visibly.
             token.ThrowIfCancellationRequested();
-            StatusChanged?.Invoke(true, $"Connected · {reader.DisplayName} · waiting for a scan");
+            var disconnectedChecks = 0;
+            string? lastStatus = null;
+            void CheckBluetooth()
+            {
+                BluetoothLinkState state;
+                try { state = _bluetooth.Check(reader); }
+                catch (Exception) { state = BluetoothLinkState.Unknown; }
+                token.ThrowIfCancellationRequested();
+                // A failed/unknown query is not evidence of a disconnected reader.
+                // Only two consecutive explicit negative results close the port.
+                disconnectedChecks = state == BluetoothLinkState.Disconnected ? disconnectedChecks + 1 : 0;
+                if (disconnectedChecks >= 2) throw new IOException("Bluetooth connection lost");
+                var status = state switch
+                {
+                    BluetoothLinkState.Connected => $"Connected · {reader.DisplayName} · waiting for a scan",
+                    BluetoothLinkState.Disconnected => $"COM open — checking Bluetooth connection · {reader.DisplayName}",
+                    _ => $"COM open — reader status unknown · {reader.DisplayName}"
+                };
+                if (status != lastStatus) { lastStatus = status; StatusChanged?.Invoke(true, status); }
+            }
+            CheckBluetooth();
             ready.TrySetResult();
+            var nextBluetoothCheck = _clock() + BluetoothCheckIntervalMs;
             var buffer = new BarcodeScanBuffer(fastScans);
             var bytes = new byte[4096];
             while (!token.IsCancellationRequested)
             {
+                // Query OS connection state on the reader worker, never the GUI thread.
+                // Serial read timeouts and time since the last scan do not indicate loss.
+                if (_clock() >= nextBluetoothCheck)
+                {
+                    CheckBluetooth();
+                    nextBluetoothCheck = _clock() + BluetoothCheckIntervalMs;
+                }
                 // Check between reads as well as on timeouts; a chunk may arrive
                 // just after a previous scan's quiet interval has completed.
                 EmitCompleted(buffer);
@@ -66,7 +109,7 @@ public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
                     if (count == 0) throw new IOException("Bluetooth serial stream closed.");
                     if (token.IsCancellationRequested) break;
                     EmitCompleted(buffer);
-                    buffer.Append(bytes.AsSpan(0, count), Environment.TickCount64);
+                    buffer.Append(bytes.AsSpan(0, count), _clock());
                     EmitCompleted(buffer);
                 }
                 catch (TimeoutException) { }
@@ -77,7 +120,9 @@ public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
         catch (Exception ex)
         {
             ready.TrySetException(ex);
-            if (!token.IsCancellationRequested) StatusChanged?.Invoke(false, "Disconnected · " + ex.Message + " · wake the reader and reconnect");
+            // The using scope above disposes the COM handle before announcing failure.
+            // The view model keeps WebSocket clients connected and owns retry policy.
+            if (!token.IsCancellationRequested) StatusChanged?.Invoke(false, "Reader disconnected · " + ex.Message);
         }
         finally { ready.TrySetCanceled(); }
     }
@@ -88,7 +133,7 @@ public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
         {
             try
             {
-                if (buffer.TakeCompleted(Environment.TickCount64) is not { } raw) return;
+                if (buffer.TakeCompleted(_clock()) is not { } raw) return;
                 ScanReceived?.Invoke(raw);
             }
             catch (InvalidDataException ex) { Diagnostic?.Invoke(ex.Message); }
@@ -118,5 +163,17 @@ public sealed class BarcodeReaderConnection : IBarcodeReaderConnection
         await _gate.WaitAsync();
         try { _disposed = true; await StopAsync(); }
         finally { _gate.Release(); }
+    }
+
+    private sealed class ReaderSerialPort(string portName) : IBarcodeSerialPort
+    {
+        private readonly SerialPort _port = new(portName, 9600, Parity.None, 8, StopBits.One)
+        {
+            Handshake = Handshake.None, ReadTimeout = 50, WriteTimeout = 1000,
+            DiscardNull = false, ReadBufferSize = 65536
+        };
+        public void Open() => _port.Open();
+        public int Read(byte[] buffer, int offset, int count) => _port.Read(buffer, offset, count);
+        public void Dispose() => _port.Dispose();
     }
 }

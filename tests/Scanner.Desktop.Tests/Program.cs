@@ -22,6 +22,13 @@ internal static class Program
                 foreach (var reader in BluetoothReaderDiscovery.Discover()) Console.WriteLine(reader.DisplayName + " | " + reader.DeviceId);
                 return 0;
             }
+            if (args.Contains("--reader-status"))
+            {
+                var probe = new WindowsBluetoothConnectionProbe();
+                foreach (var reader in BluetoothReaderDiscovery.Discover())
+                    Console.WriteLine(reader.DisplayName + " | Bluetooth: " + probe.Check(reader));
+                return 0;
+            }
             if (args.Contains("--probe-reader"))
             {
                 var reader = BluetoothReaderDiscovery.Discover().Single();
@@ -31,6 +38,8 @@ internal static class Program
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("/Scanner.Desktop;component/Theme.xaml", UriKind.Relative) });
             BarcodeReaderChecks.Run(Check);
+            BluetoothProbeChecks.Run(Check);
+            BluetoothSessionChecks.Run(Check);
             var root = Path.Combine(Path.GetTempPath(), "oeps-datamatrix-ui-" + Guid.NewGuid().ToString("N"));
             var paths = new AppPaths(["--data-dir", root]);
             File.WriteAllText(paths.SettingsFile, "{\"camera\":{\"index\":1,\"width\":640,\"height\":480,\"fps\":30},\"profile\":{\"legacy\":true},\"local_preview_enabled\":false}");

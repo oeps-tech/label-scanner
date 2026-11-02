@@ -36,7 +36,10 @@ $base = 'https://api.github.com/repos/oeps-tech/label-scanner'
 function Request([string]$Path, [string]$Method='GET', $Data=$null) {
     $requestParameters = @{ Uri=$base + $Path; Method=$Method; Headers=$headers; TimeoutSec=60 }
     if ($null -ne $Data) { $requestParameters.Body = [Text.Encoding]::UTF8.GetBytes(($Data | ConvertTo-Json -Depth 10)); $requestParameters.ContentType = 'application/json; charset=utf-8' }
-    Invoke-RestMethod @requestParameters
+    # Windows PowerShell emits REST arrays as a single pipeline item. Unwrap them
+    # so draft/asset lookup and counts work when several releases already exist.
+    $response = Invoke-RestMethod @requestParameters
+    foreach ($item in $response) { Write-Output $item }
 }
 if ((Request '').private) { throw 'Expected the already-public repository; visibility will not be changed by this script.' }
 if ((Request '/commits/main').sha -ne $sha) { throw 'Push the release commit to main before publishing.' }
