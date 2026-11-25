@@ -17,7 +17,7 @@ public static class ProtocolJson
 }
 
 /// <summary>Versioned data. Use IsCommand, IsRaw or LabelVersion to select fields. Missing supplier fields are explicit JSON nulls.</summary>
-/// <param name="LabelVersion">1 for materials, 2 for Odoo, 3 for suppliers; -1 represents commands C and 0 represents raw X in the C# API.</param>
+/// <param name="LabelVersion">1 for materials, 2 for Odoo sales order and OUT, 3 for suppliers, 4 for sales order, 5 for OUT; -1 represents commands C and 0 represents raw X in the C# API.</param>
 /// <param name="OepsPn">Version 1 part number.</param>
 /// <param name="Lot">Version 1 lot.</param>
 /// <param name="Quantity">Version 1 exact quantity text, without conversion or rounding.</param>
@@ -48,16 +48,22 @@ public sealed record LabelData(int LabelVersion,
     public static LabelData FromRaw(string raw) => new(RawVersion, null, null, null) { Raw = raw };
     public static LabelData FromCommand(string command) => new(CommandVersion, null, null, null) { Command = command };
     public static LabelData FromSupplier(string? oepsPn, string? mpn, string quantity) => new(3, oepsPn, null, quantity) { Mpn = mpn };
-    /// <summary>Version 2 internal sale.order record ID.</summary>
+    /// <summary>Creates version 4 sales order data using the printed document_name.</summary>
+    public static LabelData FromSalesOrder(int salesOrderId, string documentName)
+        => new(4, null, null, null) { SalesOrderId = salesOrderId, DocumentName = documentName };
+    /// <summary>Creates version 5 OUT data using the stock.picking record ID and printed number.</summary>
+    public static LabelData FromOut(int outId, string outNumber)
+        => new(5, null, null, null) { OutId = outId, OutNumber = outNumber };
+    /// <summary>Version 2/4 internal sale.order record ID.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SalesOrderId { get; init; }
-    /// <summary>Version 2 printed sales order document_name, for example S/2680; not Odoo's name field.</summary>
+    /// <summary>Version 2/4 printed sales order document_name, for example S/2680; not Odoo's name field.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? DocumentName { get; init; }
-    /// <summary>Version 2 internal stock.picking record ID.</summary>
+    /// <summary>Version 2/5 internal stock.picking record ID.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? OutId { get; init; }
-    /// <summary>Version 2 printed delivery number, for example WH/OUT/00567.</summary>
+    /// <summary>Version 2/5 printed delivery number, for example WH/OUT/00567.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? OutNumber { get; init; }
 
@@ -108,6 +114,14 @@ public sealed class LabelDataJsonConverter : JsonConverter<LabelData>
                     writer.WriteString("oeps_pn", value.OepsPn);
                     writer.WriteString("mpn", value.Mpn);
                     writer.WriteString("quantity", value.Quantity);
+                    break;
+                case 4:
+                    writer.WritePropertyName("sales_order_id"); JsonSerializer.Serialize(writer, value.SalesOrderId, options);
+                    writer.WriteString("document_name", value.DocumentName);
+                    break;
+                case 5:
+                    writer.WritePropertyName("out_id"); JsonSerializer.Serialize(writer, value.OutId, options);
+                    writer.WriteString("out_number", value.OutNumber);
                     break;
                 default: throw new JsonException("Unsupported label version");
             }

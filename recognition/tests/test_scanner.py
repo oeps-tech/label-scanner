@@ -28,13 +28,14 @@ def symbol(text, format=zxingcpp.BarcodeFormat.DataMatrix):
 class ScannerTests(unittest.TestCase):
     def test_mixed_label_versions(self):
         order = '2*857*S/2680*1923*WH/OUT/00567*6B6312A1'
-        canvas = np.full((520, 1000), 255, np.uint8)
-        for x, text in zip((15, 515), (payload(), order)):
+        texts = (payload(), order, '4*857*S/2680*71878073', '5*1923*WH/OUT/00567*D3BF0810')
+        canvas = np.full((520, 2000), 255, np.uint8)
+        for x, text in zip((15, 515, 1015, 1515), texts):
             code = symbol(text)
             canvas[40:40+code.shape[0], x:x+code.shape[1]] = code
         for image in (canvas, cv2.rotate(canvas, cv2.ROTATE_90_CLOCKWISE)):
             codes, _ = decode_frame(image)
-            self.assertEqual({c['raw'] for c in codes}, {payload(), order})
+            self.assertEqual({c['raw'] for c in codes}, set(texts))
 
     def test_multiple_datamatrix_and_qr(self):
         canvas=np.full((520,1500),255,np.uint8)

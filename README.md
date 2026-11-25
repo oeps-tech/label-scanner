@@ -1,6 +1,6 @@
 # OEPS Scanner
 
-Windows server and test client. The server reads barcodes from camera frames or a Bluetooth SPP reader and broadcasts versioned data over WebSocket. Version 1 identifies materials; version 2 identifies Odoo sales orders and deliveries; version 3 extracts supplier data; version C carries commands; version X carries unrecognized raw text. All ZXing-C++ supported barcode formats are enabled, including Data Matrix, QR, Aztec and linear barcodes. No ArUco markers, OCR models, label screenshots, evidence database, feedback or scan-history files are used.
+Windows server and test client. The server reads barcodes from camera frames or a Bluetooth SPP reader and broadcasts versioned data over WebSocket. Version 1 identifies materials; version 2 identifies Odoo sales orders and deliveries; version 3 extracts supplier data; versions 4 and 5 identify a sales order or OUT separately; version C carries commands; version X carries unrecognized raw text. All ZXing-C++ supported barcode formats are enabled, including Data Matrix, QR, Aztec and linear barcodes. No ArUco markers, OCR models, label screenshots, evidence database, feedback or scan-history files are used.
 
 ## Local run
 
@@ -16,7 +16,7 @@ Initial dependencies: `scripts/setup.ps1` (pinned .NET SDK and Python runtime). 
 
 ## Label payload
 
-Routing order: validate OEPS version `1`, `2` or `C`, parse recognized suppliers as version `3`, then send every other reading as raw version `X`. A supplier label that fails version 3 validation also becomes X; no decoded text is discarded because validation failed. OEPS versions 1/2/C have a 4,096-character payload limit, use single `*` separators and CRC-32/IEEE over exact ASCII bytes before the final separator/checksum. Those inputs are not trimmed or normalized. Versions 3/X are assigned by the server; their barcodes do not need a version prefix or OEPS checksum.
+Routing order: validate OEPS version `1`, `2`, `4`, `5` or `C`, parse recognized suppliers as version `3`, then send every other reading as raw version `X`. A supplier label that fails version 3 validation also becomes X; no decoded text is discarded because validation failed. OEPS versions 1/2/4/5/C have a 4,096-character payload limit, use single `*` separators and CRC-32/IEEE over exact ASCII bytes before the final separator/checksum. Those inputs are not trimmed or normalized. Versions 3/X are assigned by the server; their barcodes do not need a version prefix or OEPS checksum.
 
 ### Version 1: materials
 
@@ -86,6 +86,38 @@ Actual ASCII RS/GS/EOT delimiters are supported, as are literal `<rs>`, `<gs>`, 
 {"label_version":3,"oeps_pn":null,"mpn":"74LVC4245AD,118","quantity":"200"}
 ```
 
+### Versions 4 and 5: separate Odoo documents
+
+These use the same field-validation and CRC-32 rules as version 2. Version 4 carries only the sales order; version 5 carries only the OUT. Both require exactly four fields including the checksum:
+
+```text
+4*<sales_order_id>*<document_name>*<checksum>
+4*857*S/2680*71878073
+
+5*<out_id>*<out_number>*<checksum>
+5*1923*WH/OUT/00567*D3BF0810
+```
+
+The ID must contain digits only, with a value from 1 to 2147483647. Leading zeros are accepted and become a JSON integer. The printed number must be nonblank printable ASCII without `*` or control characters; spaces, slashes and case are preserved exactly. For version 4 use Odoo's printed **`document_name`**, not `name`. No fixed numbering prefix is required. The complete payload is limited to 4,096 characters.
+
+CRC-32/IEEE covers the exact first **three** fields, including their separators. Exclude the final `*` and checksum; format the CRC as eight uppercase hexadecimal characters. Recalculate it when changing the version or any field. Invalid labels become raw X.
+
+```python
+import zlib
+payload = f"4*{sales_order_id}*{document_name}"
+# For version 5: payload = f"5*{out_id}*{out_number}"
+barcode_data = f"{payload}*{zlib.crc32(payload.encode('ascii')):08X}"
+```
+
+JSON contains exactly three fields, with no checksum or unrelated fields:
+
+```json
+{"label_version":4,"sales_order_id":857,"document_name":"S/2680"}
+{"label_version":5,"out_id":1923,"out_number":"WH/OUT/00567"}
+```
+
+The client supplies its Odoo address and decides how to open the record. Camera filtering remains 500 ms per exact payload; every reader scan is forwarded. Versions 4/5 are included in v0.2.2; update the server and both client DLLs to use them.
+
 ### Version C: commands
 
 ```text
@@ -127,7 +159,7 @@ Camera duplicates are suppressed for 500 ms; every reader scan is forwarded, inc
 {"label_version":"X","raw":"OEPS-1234\tsecond field\r\nnext line"}
 ```
 
-Only the original decoded text is sent; no checksum, prefix, content validation, trimming or separator rewriting is applied. Tabs, CR/LF, RS/GS/EOT, Unicode and asterisks survive JSON round trips; JSON escape sequences are restored by the client JSON parser. The barcode text need not start with `X*`. Every code that does not pass versions 1, 2, 3 or C uses X, including recognized suppliers that fail validation. Clients decide whether to use X.
+Only the original decoded text is sent; no checksum, prefix, content validation, trimming or separator rewriting is applied. Tabs, CR/LF, RS/GS/EOT, Unicode and asterisks survive JSON round trips; JSON escape sequences are restored by the client JSON parser. The barcode text need not start with `X*`. Every code that does not pass versions 1, 2, 3, 4, 5 or C uses X, including recognized suppliers that fail validation. Clients decide whether to use X.
 
 ### Connection and schema
 
@@ -143,7 +175,7 @@ Version 2:
 {"label_version":2,"sales_order_id":857,"document_name":"S/2680","out_id":1923,"out_number":"WH/OUT/00567"}
 ```
 
-Version 1/3 quantity is a **string**, preserving precision and formatting. Version 2 record IDs are JSON integers and printed numbers are strings. Versions 1/2/3 have numeric `label_version`; commands and raw fallback use strings `"C"` and `"X"` respectively. No checksum, timestamps, images, envelope or greeting are transmitted. There is no acknowledgement, feedback or replay mechanism. Disconnected clients miss readings; nothing is stored for later delivery. The test client displays only the latest data in memory and reconnects while connection is requested. [Client DLL integration](docs/client-library.md) describes `ConnectAsync(ip, port, thisComputer)`, `JsonReceived` and `CloseAsync()`. Run `scripts/build-client.ps1` to build a local DLL bundle. `examples/Scanner.LabelConsumer` demonstrates its use. Update both client DLLs for version C: previous DLLs reject unsupported versions.
+Version 1/3 quantity is a **string**, preserving precision and formatting. Version 2 record IDs are JSON integers and printed numbers are strings. Versions 1/2/3/4/5 have numeric `label_version`; commands and raw fallback use strings `"C"` and `"X"` respectively. No checksum, timestamps, images, envelope or greeting are transmitted. There is no acknowledgement, feedback or replay mechanism. Disconnected clients miss readings; nothing is stored for later delivery. The test client displays only the latest data in memory and reconnects while connection is requested. [Client DLL integration](docs/client-library.md) describes `ConnectAsync(ip, port, thisComputer)`, `JsonReceived` and `CloseAsync()`. Run `scripts/build-client.ps1` to build a local DLL bundle. `examples/Scanner.LabelConsumer` demonstrates its use. Update both client DLLs for versions 4/5: previous DLLs reject unsupported versions.
 
 For camera readings, every label version, including X and future versions, shares the same duplicate policy: each exact decoded payload has its own 500 ms cooldown after being queued to at least one client. Observations inside the cooldown do not extend it. Different payloads may be sent immediately, including different versions and multiple codes in one frame. Whitespace differences count as different raw payloads. A label remaining visible to the camera may therefore repeat every 500 ms. Barcode-reader readings have no duplicate suppression: every scan, including immediate identical repeats, is sent to reader clients. Receivers should not equate camera observations with inventory transactions.
 

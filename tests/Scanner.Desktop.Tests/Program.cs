@@ -60,6 +60,14 @@ internal static class Program
             Check(vm.Fields.Count == 5 && vm.Fields.Any(f => f.Name == "Document name" && f.Value == "S/2680")
                 && vm.Fields.Any(f => f.Name == "OUT number" && f.Value == "WH/OUT/00567"), "Client displays all version 2 data including document_name");
             Check(!vm.Json.Contains("quantity") && !vm.Json.Contains("oeps_pn"), "Switching to version 2 leaves no stale material data");
+            vm.Display(LabelData.FromSalesOrder(857, "S/2680"));
+            Check(vm.LabelVersion == "4" && vm.Fields.Count == 3 && vm.Fields.Any(f => f.Name == "Sales order ID" && f.Value == "857")
+                && vm.Fields.Any(f => f.Name == "Document name" && f.Value == "S/2680") && !vm.Json.Contains("out_id") && !vm.Json.Contains("out_number"),
+                "Version 4 shows only the sales order and removes version 2 delivery fields");
+            vm.Display(LabelData.FromOut(1923, "WH/OUT/00567"));
+            Check(vm.LabelVersion == "5" && vm.Fields.Count == 3 && vm.Fields.Any(f => f.Name == "OUT ID" && f.Value == "1923")
+                && vm.Fields.Any(f => f.Name == "OUT number" && f.Value == "WH/OUT/00567") && !vm.Json.Contains("sales_order_id") && !vm.Json.Contains("document_name"),
+                "Version 5 shows only the OUT and removes sales order fields");
             vm.Display(new LabelData(1, "OEPSA010123", "0926-TRAY-Q5R2", "0"));
             Check(vm.Fields.Count == 4 && vm.Quantity == "0" && !vm.Json.Contains("document_name"), "Client switches back to version 1 cleanly");
             vm.Display(LabelData.FromSupplier(null, "74LVC4245AD,118", "200"));
@@ -71,7 +79,7 @@ internal static class Program
                 && !vm.Json.Contains("raw") && !vm.Json.Contains("quantity"), "Client shows command C without stale raw or quantity fields");
             vm.Display(new LabelData(1, "OEPSA010123", "0926-TRAY-Q5R2", "1"));
             Check(vm.Fields.Count == 4 && !vm.Json.Contains("command"), "Client switches back from command to material data");
-            Check(LabelVersionReference.All.Select(v => v.Version).SequenceEqual(new[] { "1", "2", "3", "C", "X" }), "Label reference lists all versions");
+            Check(LabelVersionReference.All.Select(v => v.Version).SequenceEqual(new[] { "1", "2", "3", "4", "5", "C", "X" }), "Label reference lists all versions");
             foreach (var reference in LabelVersionReference.All)
                 Check(LabelClassifier.Classify(reference.ExamplePayload).Data == PayloadValidator.ReadClientJson(reference.ExampleJson), "Label reference examples agree with live classification and JSON schema");
             var referenceWindow = new Scanner.Server.LabelVersionsWindow();

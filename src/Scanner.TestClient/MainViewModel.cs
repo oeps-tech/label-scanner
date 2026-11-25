@@ -72,6 +72,8 @@ public sealed class MainViewModel : ObservableObject, IAsyncDisposable
             2 => [new("Label version", LabelVersion), new("Sales order ID", data.SalesOrderId!.Value.ToString()),
                 new("Document name", data.DocumentName!), new("OUT ID", data.OutId!.Value.ToString()), new("OUT number", data.OutNumber!)],
             3 => [new("Label version", LabelVersion), new("OEPS PN", OepsPn), new("MPN", data.Mpn ?? "—"), new("Quantity", Quantity)],
+            4 => [new("Label version", LabelVersion), new("Sales order ID", data.SalesOrderId!.Value.ToString()), new("Document name", data.DocumentName!)],
+            5 => [new("Label version", LabelVersion), new("OUT ID", data.OutId!.Value.ToString()), new("OUT number", data.OutNumber!)],
             LabelData.CommandVersion => [new("Label version", "C"), new("Command", data.Command!)],
             LabelData.RawVersion => [new("Label version", "X"), new("Raw text", data.Raw!)],
             _ => throw new InvalidDataException("Unsupported label version")

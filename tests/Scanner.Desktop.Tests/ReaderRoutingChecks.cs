@@ -67,13 +67,14 @@ internal static class ReaderRoutingChecks
             }
             check(!cameraWaiting.IsCompleted, "Reader scans never reach camera clients");
             foreach (var payload in new[] { "1*OEPSA010123*0926-TRAY-Q5R2*0*AE1BA040", "2*857*S/2680*1923*WH/OUT/00567*6B6312A1",
+                "4*857*S/2680*71878073", "5*1923*WH/OUT/00567*D3BF0810", "4*857*S/2680*00000000", "5*1923*WH/OUT/00567*00000000",
                 "C*For Odoo OUT*14C79D4D", "C*Disable*7434FE41", "C*Disable*00000000",
                 "{pbn:pick,on:order,pc:stock,pm:INA826AIDR,qty:100}", "{pbn:pick,on:order,pc:stock,pm:INA826AIDR}", "\tX\r\n\0é😀\x1d\x1e\x04" })
             {
                 fake.Emit(payload); fake.Emit(payload);
                 for (var i = 0; i < 2; i++)
                 {
-                    check(Receive(readerClient, timeout.Token) == LabelClassifier.Classify(payload).Data, "Reader sends repeated 1/2/3/C/X with unchanged schema and contents");
+                    check(Receive(readerClient, timeout.Token) == LabelClassifier.Classify(payload).Data, "Reader sends repeated 1/2/3/4/5/C/X with unchanged schema and contents");
                     _ = Receive(secondReader, timeout.Token);
                 }
                 check(!model.Diagnostics.Single().Status.Contains("suppressed"), "No version is subject to reader duplicate suppression");
@@ -95,6 +96,18 @@ internal static class ReaderRoutingChecks
             check(model.Diagnostics.Single().Status.Contains("suppressed"), "Command camera repeat uses 500 ms suppression");
             EmitCamera(model, "C*Disable*00000000");
             check(Receive(cameraClient, timeout.Token) == LabelData.FromRaw("C*Disable*00000000"), "Camera routes corrupt command as X");
+            foreach (var (payload, data) in new[] {
+                ("4*857*S/2680*71878073", LabelData.FromSalesOrder(857, "S/2680")),
+                ("5*1923*WH/OUT/00567*D3BF0810", LabelData.FromOut(1923, "WH/OUT/00567")) })
+            {
+                EmitCamera(model, payload);
+                check(Receive(cameraClient, timeout.Token) == data, "Camera sends each single-document schema independently of reader scans");
+                EmitCamera(model, payload);
+                check(model.Diagnostics.Single().Status.Contains("suppressed"), "Single-document camera repeat uses 500 ms suppression");
+                var corrupted = payload[..^8] + "00000000";
+                EmitCamera(model, corrupted);
+                check(Receive(cameraClient, timeout.Token) == LabelData.FromRaw(corrupted), "Camera forwards corrupt single-document barcode as exact X");
+            }
 
             readerClient.Abort(); Until(() => reader.LabelClientCount == 1);
             now += 61000; Update(model);

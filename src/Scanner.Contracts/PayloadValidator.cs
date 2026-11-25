@@ -63,7 +63,7 @@ public static partial class PayloadValidator
         if (raw is null || raw.Length > 4096) return new(null, "payload", "Missing or oversized payload");
         var separator = raw.IndexOf('*');
         var version = separator < 0 ? raw : raw[..separator];
-        if (version is not ("1" or "2" or "C")) return new(null, "version", "Unsupported label version; expected 1, 2 or C");
+        if (version is not ("1" or "2" or "4" or "5" or "C")) return new(null, "version", "Unsupported label version; expected 1, 2, 4, 5 or C");
         var fields = raw.Split('*', StringSplitOptions.None);
         LabelData data;
         if (version == "1")
@@ -82,6 +82,15 @@ public static partial class PayloadValidator
             if (!TryRecordId(fields[3], out var outId)) return new(null, "out_id", "Expected an integer record ID from 1 to 2147483647 (digits only)");
             if (!IsDocumentNumber(fields[4])) return new(null, "out_number", "Expected a nonblank printable ASCII delivery number without *");
             data = new(2, salesOrderId, fields[2], outId, fields[4]);
+        }
+        else if (version is "4" or "5")
+        {
+            if (fields.Length != 4) return new(null, "fields", $"Version {version} expects four fields separated by a single *");
+            var idField = version == "4" ? "sales_order_id" : "out_id";
+            var numberField = version == "4" ? "document_name" : "out_number";
+            if (!TryRecordId(fields[1], out var recordId)) return new(null, idField, "Expected an integer record ID from 1 to 2147483647 (digits only)");
+            if (!IsDocumentNumber(fields[2])) return new(null, numberField, $"Expected a nonblank printable ASCII {numberField} without *; preserve the printed document number");
+            data = version == "4" ? LabelData.FromSalesOrder(recordId, fields[2]) : LabelData.FromOut(recordId, fields[2]);
         }
         else
         {
@@ -115,7 +124,7 @@ public static partial class PayloadValidator
                 throw new JsonException("Version X requires exactly label_version and raw text");
             return LabelData.FromRaw(root.GetProperty("raw").GetString()!);
         }
-        if (versionElement.ValueKind != JsonValueKind.Number || !versionElement.TryGetInt32(out var version) || version is not (1 or 2 or 3))
+        if (versionElement.ValueKind != JsonValueKind.Number || !versionElement.TryGetInt32(out var version) || version is not (1 or 2 or 3 or 4 or 5))
             throw new JsonException("Unsupported or invalid label version");
         if (version == 3)
         {
@@ -141,6 +150,18 @@ public static partial class PayloadValidator
             var outNumber = root.GetProperty("out_number").GetString()!;
             if (!IsDocumentNumber(documentName) || !IsDocumentNumber(outNumber)) throw new JsonException("Invalid document numbers");
             return new(2, salesOrderId, documentName, outId, outNumber);
+        }
+        if (version is 4 or 5)
+        {
+            var expectedNames = version == 4 ? new[] { "document_name", "label_version", "sales_order_id" } : new[] { "label_version", "out_id", "out_number" };
+            if (!names.SequenceEqual(expectedNames)) throw new JsonException($"Expected exactly three fields for version {version}");
+            var idField = root.GetProperty(version == 4 ? "sales_order_id" : "out_id");
+            var numberField = root.GetProperty(version == 4 ? "document_name" : "out_number");
+            if (idField.ValueKind != JsonValueKind.Number || !idField.TryGetInt32(out var recordId) || recordId <= 0
+                || numberField.ValueKind != JsonValueKind.String) throw new JsonException($"Invalid version {version} data types or record ID");
+            var number = numberField.GetString()!;
+            if (!IsDocumentNumber(number)) throw new JsonException("Invalid document number");
+            return version == 4 ? LabelData.FromSalesOrder(recordId, number) : LabelData.FromOut(recordId, number);
         }
         if (!names.SequenceEqual(new[] { "label_version", "lot", "oeps_pn", "quantity" })) throw new JsonException("Expected exactly four data fields");
         if (root.GetProperty("oeps_pn").ValueKind != JsonValueKind.String || root.GetProperty("lot").ValueKind != JsonValueKind.String

@@ -53,6 +53,7 @@ internal static class Program
             Check(!PayloadValidator.Validate(Encode($"1*OEPSA010123*0926-TRAY-Q5R2*{q}")).Valid, "Reject invalid quantity");
         Check(PayloadValidator.Validate("3*bad").Stage == "version", "Version gates all other validation");
         Version2Checks.Run(Check);
+        OdooDocumentChecks.Run(Check);
         CommandChecks.Run(Check);
         SupplierChecks.Run(Check);
         Check(!PayloadValidator.Validate("1*OEPSA010123*0926-TRAY-Q5R2*0*01234567").Valid, "User placeholder is not a valid CRC");
@@ -126,14 +127,16 @@ internal static class Program
         host.PublishLabel(data);
         Check(await delivered.Reader.ReadAsync(timeout.Token) == data, "SDK switches back to version 1 without reconnecting");
         Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(data), "Version 1 schema stays unchanged after version 2");
-        foreach (var additional in new[] { LabelData.FromCommand("For Odoo OUT"), LabelData.FromCommand("For Odoo OUT"),
+        foreach (var additional in new[] { LabelData.FromSalesOrder(857, "S/2680"), LabelData.FromOut(1923, "WH/OUT/00567"),
+            LabelData.FromSalesOrder(1, new string('<', 4083)), LabelData.FromOut(1, new string('<', 4083)),
+            LabelData.FromCommand("For Odoo OUT"), LabelData.FromCommand("For Odoo OUT"),
             LabelData.FromCommand(new string('<', 4085)), LabelData.FromRaw("C*Disable*00000000"),
             LabelData.FromRaw(SupplierChecks.RawText), LabelData.FromSupplier(null, "74LVC4245AD,118", "200"),
             LabelData.FromSupplier("OEPS070090", null, "195"), LabelData.FromRaw(new string('\x1d', 10000)) })
         {
             host.PublishLabel(additional);
-            Check(await delivered.Reader.ReadAsync(timeout.Token) == additional, "Same SDK connection accepts C, X and supplier fields without losing characters or repeated commands");
-            Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(additional), "Exact command/supplier/raw JSON received over real websocket");
+            Check(await delivered.Reader.ReadAsync(timeout.Token) == additional, "Same SDK connection accepts Odoo documents, C, X and supplier fields without losing characters or repeated commands");
+            Check(await jsonMessages.Reader.ReadAsync(timeout.Token) == ProtocolJson.Serialize(additional), "Exact document/command/supplier/raw JSON received over real websocket");
         }
         await sdk.CloseAsync();
         await Until(() => host.LabelClientCount == 1);

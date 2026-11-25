@@ -12,7 +12,7 @@ public sealed record LabelVersionReference(string Version, string Format, IReadO
     public string Name => Version == "C" ? "Version C — Commands" : $"Version {Version}";
 
     // When implementing another label version, add its reference here alongside its validator support.
-    public static IReadOnlyList<LabelVersionReference> All { get; } = [Version1(), Version2(), Version3(), VersionC(), VersionX()];
+    public static IReadOnlyList<LabelVersionReference> All { get; } = [Version1(), Version2(), Version3(), OdooDocument(4), OdooDocument(5), VersionC(), VersionX()];
 
     private static LabelVersionReference Version1()
     {
@@ -60,7 +60,7 @@ public sealed record LabelVersionReference(string Version, string Format, IReadO
         const string raw = "{pbn:PICK2610150002,on:WM2610150052,pc:C38433,pm:INA826AIDR,qty:100,mc:OEPS080248 STIMJIM FILIPE,cc:1,pdi:242369319,hp:21,wc:ZH}";
         return new("3", "Recognized supplier barcode; no 3* prefix required",
         [
-            new("Routing", "Valid OEPS version 1/2/C labels take priority. Worldway and the supplied Farnell/Mouser/DigiKey formats become version 3."),
+            new("Routing", "Valid OEPS version 1/2/4/5/C labels take priority. Worldway and the supplied Farnell/Mouser/DigiKey formats become version 3."),
             new("Fields", "Worldway: mc → OEPS PN, pm → MPN, qty → quantity. ISO 15434 format 06: P → OEPS PN, 1P → MPN, Q → quantity. P, 1P, 3P and 30P are distinct identifiers."),
             new("OEPS PN", "A whole whitespace-delimited token matching OEPS plus six digits, or one uppercase letter plus five or six digits. Missing, invalid or ambiguous matches become null; never use a supplier part number as OEPS PN."),
             new("MPN", "Extracted from pm or 1P, with punctuation such as commas preserved. Missing/blank values become null."),
@@ -70,6 +70,30 @@ public sealed record LabelVersionReference(string Version, string Format, IReadO
         ], "No OEPS checksum is required or generated for supplier labels.", raw,
         JsonSerializer.Serialize(LabelClassifier.Classify(raw).Data, new JsonSerializerOptions(ProtocolJson.Options) { WriteIndented = true }),
         "Exactly label_version (number 3), oeps_pn (string or null), mpn (string or null), quantity (string). At least one identifier must be present. No raw text, supplier metadata or checksum is added.");
+    }
+
+    private static LabelVersionReference OdooDocument(int version)
+    {
+        var isOrder = version == 4;
+        var idField = isOrder ? "sales_order_id" : "out_id";
+        var numberField = isOrder ? "document_name" : "out_number";
+        var body = isOrder ? "4*857*S/2680" : "5*1923*WH/OUT/00567";
+        var payload = body + "*" + PayloadValidator.Crc32(body);
+        var example = PayloadValidator.Validate(payload);
+        if (!example.Valid) throw new InvalidOperationException($"The version {version} reference example no longer matches the label validator.");
+        return new(version.ToString(), $"{version}*<{idField}>*<{numberField}>*<checksum>",
+        [
+            new("label_version", $"Must be exactly {version}. Based on version 2, carrying only the {(isOrder ? "sales order" : "OUT")}."),
+            new("Structure", "Exactly four fields separated by a single *. Maximum 4,096 characters. No trimming or case changes."),
+            new(idField, $"Internal Odoo {(isOrder ? "sale.order" : "stock.picking")} ID: digits only, value from 1 to 2147483647. Leading zeros are accepted; JSON contains an integer."),
+            new(numberField, isOrder
+                ? "Printed sales order document_name, for example S/2680; not name (S23661). Same rules as version 2: nonblank printable ASCII without * or control characters. Spaces, slashes and case are preserved. No fixed prefix."
+                : "Printed delivery number, for example WH/OUT/00567. Same rules as version 2: nonblank printable ASCII without * or control characters. Spaces, slashes and case are preserved. No fixed warehouse prefix."),
+            new("checksum", "Exactly eight uppercase hexadecimal characters (0–9 and A–F), matching CRC-32/IEEE.")
+        ],
+        "Calculate CRC-32/IEEE (compatible with zlib.crc32) over the exact ASCII text of the first three fields and their single * separators. Exclude the final * and checksum. Do not add a newline or normalize text. Format as eight uppercase hexadecimal characters.",
+        payload, JsonSerializer.Serialize(example.Data, new JsonSerializerOptions(ProtocolJson.Options) { WriteIndented = true }),
+        $"Exactly label_version (number {version}), {idField} (number) and {numberField} (string). No checksum or fields from other versions. Clients use the ID with their Odoo address; the scanner does not look up or open records. Invalid labels fall back to raw X.");
     }
 
     private static LabelVersionReference VersionC()
@@ -95,9 +119,9 @@ public sealed record LabelVersionReference(string Version, string Format, IReadO
     private static LabelVersionReference VersionX()
     {
         const string raw = "OEPS-1234\tsecond field\r\nnext line";
-        return new("X", "Any decoded text that fails versions 1, 2, 3 and C; no X* prefix required",
+        return new("X", "Any decoded text that fails versions 1, 2, 3, 4, 5 and C; no X* prefix required",
         [
-            new("Routing", "Fallback whenever versions 1, 2, 3 and C do not validate. This includes invalid command labels, bad OEPS checksums and supplier labels with invalid/missing quantity, missing identifiers, malformed structure or duplicate fields. No decoded code is discarded because it fails validation."),
+            new("Routing", "Fallback whenever versions 1, 2, 3, 4, 5 and C do not validate. This includes invalid command labels, bad OEPS checksums and supplier labels with invalid/missing quantity, missing identifiers, malformed structure or duplicate fields. No decoded code is discarded because it fails validation."),
             new("Raw text", "No content validation, trimming, case conversion or separator replacement. Preserve tabs, CR/LF, RS/GS/EOT, Unicode, asterisks and empty text. Only the original decoded string is sent."),
             new("JSON", "Escapes such as \\t, \\r, \\n and \\u001d are JSON encoding; parsing restores the actual characters. Clients decide whether to use X messages.")
         ], "No checksum is required or generated for X.", raw,

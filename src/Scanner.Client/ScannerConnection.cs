@@ -14,11 +14,11 @@ public sealed class ScannerConnection : IAsyncDisposable
     private bool _disposed;
     public bool Connected => _socket?.State == WebSocketState.Open;
     /// <summary>
-    /// Raised once per well-formed server message with the original JSON. Versions 1/2/3/C are structured; X carries unvalidated raw text.
+    /// Raised once per well-formed server message with the original JSON. Versions 1/2/3/4/5/C are structured; X carries unvalidated raw text.
     /// Subscribe before connecting. Handlers run on the receive loop; keep them short and marshal UI updates.
     /// </summary>
     public event Action<string>? JsonReceived;
-    /// <summary>Versions 1/2/3/C or raw X. Check IsCommand, IsRaw or LabelVersion before reading version-specific fields.</summary>
+    /// <summary>Versions 1/2/3/4/5/C or raw X. Check IsCommand, IsRaw or LabelVersion before reading version-specific fields.</summary>
     public event Action<LabelData>? LabelReceived;
     public event Action<string>? StateChanged;
     /// <summary>Connects to the server at the given IP/host and port, or to this computer.</summary>
